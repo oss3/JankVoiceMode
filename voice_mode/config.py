@@ -634,7 +634,17 @@ VAD_AGGRESSIVENESS = int(os.getenv("VOICEMODE_VAD_AGGRESSIVENESS", "2"))  # 0-3,
 SILENCE_THRESHOLD_MS = int(os.getenv("VOICEMODE_SILENCE_THRESHOLD_MS", "1000"))  # Stop after 1000ms (1 second) of silence
 MIN_RECORDING_DURATION = float(os.getenv("VOICEMODE_MIN_RECORDING_DURATION", "0.5"))  # Minimum 0.5s recording
 VAD_CHUNK_DURATION_MS = 30  # VAD frame size (must be 10, 20, or 30ms)
+VAD_ENERGY_THRESHOLD = float(os.getenv("VOICEMODE_VAD_ENERGY_THRESHOLD", "20"))  # Minimum RMS energy to accept VAD speech detection (0 = disabled)
+VAD_PRE_ROLL_DURATION = float(os.getenv("VOICEMODE_VAD_PRE_ROLL_DURATION", "2.0"))  # Seconds of audio to keep before speech detection trigger
 INITIAL_SILENCE_GRACE_PERIOD = float(os.getenv("VOICEMODE_INITIAL_SILENCE_GRACE_PERIOD", "1"))  # No initial silence grace period by default
+
+# Push-to-talk signal files
+# When PTT_START_FILE exists, recording begins immediately. The file is deleted after being read.
+# When PTT_STOP_FILE exists, recording stops immediately. The file is deleted after being read.
+# Create with: touch ~/.voicemode/push-to-talk-start (or -stop)
+PTT_START_FILE = BASE_DIR / "push-to-talk-start"
+PTT_STOP_FILE = BASE_DIR / "push-to-talk-stop"
+PTT_START_TIMEOUT = float(os.getenv("VOICEMODE_PTT_START_TIMEOUT", "300"))  # Max seconds to wait for PTT start (5 min default)
 
 # Default listen duration for converse tool
 DEFAULT_LISTEN_DURATION = float(os.getenv("VOICEMODE_DEFAULT_LISTEN_DURATION", "120.0"))  # Default 120s listening time

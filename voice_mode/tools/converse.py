@@ -50,6 +50,8 @@ from voice_mode.config import (
     SKIP_TTS,
     TTS_SPEED,
     VAD_CHUNK_DURATION_MS,
+    VAD_ENERGY_THRESHOLD,
+    VAD_PRE_ROLL_DURATION,
     INITIAL_SILENCE_GRACE_PERIOD,
     DEFAULT_LISTEN_DURATION,
     TTS_VOICES,
@@ -63,7 +65,10 @@ from voice_mode.config import (
     MP3_BITRATE,
     CONCH_ENABLED,
     CONCH_TIMEOUT,
-    CONCH_CHECK_INTERVAL
+    CONCH_CHECK_INTERVAL,
+    PTT_START_FILE,
+    PTT_STOP_FILE,
+    PTT_START_TIMEOUT
 )
 import voice_mode.config
 from voice_mode.provider_discovery import provider_registry
@@ -846,7 +851,12 @@ def record_audio_with_silence_detection(max_duration: float, disable_silence_det
         recording_duration = 0
         speech_detected = False
         stop_recording = False
-        
+
+        # Pre-roll buffer: keep recent audio so we capture speech onset
+        from collections import deque
+        pre_roll_chunks = int(VAD_PRE_ROLL_DURATION / chunk_duration_s)
+        pre_roll_buffer = deque(maxlen=pre_roll_chunks)
+
         # Use a queue for thread-safe communication
         import queue
         audio_queue = queue.Queue()
@@ -898,6 +908,22 @@ def record_audio_with_silence_detection(max_duration: float, disable_silence_det
                 logger.debug("Started continuous audio stream")
                 
                 while recording_duration < max_duration and not stop_recording:
+                    # Push-to-talk stop: check if the signal file exists
+                    try:
+                        if PTT_STOP_FILE.exists():
+                            PTT_STOP_FILE.unlink()
+                            logger.info("Push-to-talk stop signal received -- stopping recording")
+                            stop_recording = True
+                            # Mark speech as detected so any captured audio gets processed
+                            if chunks or len(pre_roll_buffer) > 0:
+                                if not speech_detected:
+                                    chunks.extend(pre_roll_buffer)
+                                    pre_roll_buffer.clear()
+                                speech_detected = True
+                            break
+                    except OSError as ptt_err:
+                        logger.warning(f"Error checking push-to-talk stop file: {ptt_err}")
+
                     try:
                         # Get audio chunk from queue with timeout
                         chunk = audio_queue.get(timeout=0.1)
@@ -910,7 +936,10 @@ def record_audio_with_silence_detection(max_duration: float, disable_silence_det
                         
                         # Flatten for consistency
                         chunk_flat = chunk.flatten()
-                        chunks.append(chunk_flat)
+                        if speech_detected:
+                            chunks.append(chunk_flat)
+                        else:
+                            pre_roll_buffer.append(chunk_flat)
                         
                         # For VAD, we need to downsample from 24kHz to 16kHz
                         # Use scipy's resample for proper downsampling
@@ -938,11 +967,23 @@ def record_audio_with_silence_detection(max_duration: float, disable_silence_det
                         if not speech_detected:
                             # WAITING_FOR_SPEECH state
                             if is_speech:
-                                logger.info("🎤 Speech detected, starting active recording")
-                                if VAD_DEBUG:
-                                    logger.info(f"[VAD_DEBUG] STATE CHANGE: WAITING_FOR_SPEECH -> SPEECH_ACTIVE at t={recording_duration:.1f}s")
-                                speech_detected = True
-                                silence_duration_ms = 0
+                                # Energy gate: reject VAD false positives from quiet noise
+                                if VAD_ENERGY_THRESHOLD > 0:
+                                    rms = np.sqrt(np.mean(chunk_flat.astype(float)**2))
+                                    if rms < VAD_ENERGY_THRESHOLD:
+                                        if VAD_DEBUG:
+                                            logger.info(f"[VAD_DEBUG] Energy gate rejected speech: RMS={rms:.0f} < threshold={VAD_ENERGY_THRESHOLD:.0f}")
+                                        is_speech = False
+                                if is_speech:
+                                    # Flush pre-roll buffer to capture speech onset
+                                    chunks.extend(pre_roll_buffer)
+                                    chunks.append(chunk_flat)
+                                    pre_roll_buffer.clear()
+                                    logger.info(f"🎤 Speech detected, starting active recording (pre-roll: {len(chunks)} chunks, ~{len(chunks) * chunk_duration_s:.1f}s)")
+                                    if VAD_DEBUG:
+                                        logger.info(f"[VAD_DEBUG] STATE CHANGE: WAITING_FOR_SPEECH -> SPEECH_ACTIVE at t={recording_duration:.1f}s")
+                                    speech_detected = True
+                                    silence_duration_ms = 0
                             # No timeout in this state - just keep waiting
                             # The only exit is speech detection or max_duration
                         else:
@@ -1092,7 +1133,8 @@ async def converse(
     chime_leading_silence: Optional[float] = None,
     chime_trailing_silence: Optional[float] = None,
     metrics_level: Optional[Literal["minimal", "summary", "verbose"]] = None,
-    wait_for_conch: Union[bool, str] = False
+    wait_for_conch: Union[bool, str] = False,
+    wait_for_ptt: Union[bool, str] = False
 ) -> str:
     """Have an ongoing voice conversation - speak a message and optionally listen for response.
 
@@ -1138,6 +1180,9 @@ KEY PARAMETERS:
 • wait_for_conch (bool, default: false): Multi-agent coordination
   - false: If another agent is speaking, return status immediately
   - true: Wait until the other agent finishes, then speak
+• wait_for_ptt (bool, default: false): Push-to-talk mode
+  - false: Start recording immediately after TTS completes
+  - true: Wait until the user creates ~/.voicemode/push-to-talk-start before recording
 
 PRIVACY: Microphone access required when wait_for_response=true.
          Audio processed via STT service, not stored.
@@ -1156,6 +1201,8 @@ consult the MCP resources listed above.
         skip_tts = skip_tts.lower() in ('true', '1', 'yes', 'on')
     if isinstance(wait_for_conch, str):
         wait_for_conch = wait_for_conch.lower() in ('true', '1', 'yes', 'on')
+    if isinstance(wait_for_ptt, str):
+        wait_for_ptt = wait_for_ptt.lower() in ('true', '1', 'yes', 'on')
 
     # Convert vad_aggressiveness to integer if provided as string
     if vad_aggressiveness is not None and isinstance(vad_aggressiveness, str):
@@ -1478,7 +1525,27 @@ consult the MCP resources listed above.
 
                 # Brief pause before listening
                 await asyncio.sleep(0.5)
-                
+
+                # If push-to-talk mode is enabled, wait for start signal
+                if wait_for_ptt:
+                    logger.info("⏳ Waiting for push-to-talk start signal (touch ~/.voicemode/push-to-talk-start)...")
+                    ptt_wait_start = time.perf_counter()
+                    ptt_started = False
+                    while (time.perf_counter() - ptt_wait_start) < PTT_START_TIMEOUT:
+                        try:
+                            if PTT_START_FILE.exists():
+                                PTT_START_FILE.unlink()
+                                logger.info("🎤 Push-to-talk start signal received -- beginning recording")
+                                ptt_started = True
+                                break
+                        except OSError as ptt_err:
+                            logger.warning(f"Error checking push-to-talk start file: {ptt_err}")
+                        await asyncio.sleep(0.1)  # Check every 100ms
+
+                    if not ptt_started:
+                        logger.warning(f"Push-to-talk start timeout after {PTT_START_TIMEOUT}s")
+                        return f"Push-to-talk timeout: No start signal received within {PTT_START_TIMEOUT}s"
+
                 # Play "listening" feedback sound
                 await play_audio_feedback(
                     "listening",
