@@ -1133,8 +1133,7 @@ async def converse(
     chime_leading_silence: Optional[float] = None,
     chime_trailing_silence: Optional[float] = None,
     metrics_level: Optional[Literal["minimal", "summary", "verbose"]] = None,
-    wait_for_conch: Union[bool, str] = False,
-    wait_for_ptt: Union[bool, str] = False
+    wait_for_conch: Union[bool, str] = False
 ) -> str:
     """Have an ongoing voice conversation - speak a message and optionally listen for response.
 
@@ -1180,9 +1179,8 @@ KEY PARAMETERS:
 • wait_for_conch (bool, default: false): Multi-agent coordination
   - false: If another agent is speaking, return status immediately
   - true: Wait until the other agent finishes, then speak
-• wait_for_ptt (bool, default: false): Push-to-talk mode
-  - false: Start recording immediately after TTS completes
-  - true: Wait until the user creates ~/.voicemode/push-to-talk-start before recording
+
+Push-to-talk is always required. Recording starts when ~/.voicemode/push-to-talk-start is created.
 
 PRIVACY: Microphone access required when wait_for_response=true.
          Audio processed via STT service, not stored.
@@ -1201,8 +1199,6 @@ consult the MCP resources listed above.
         skip_tts = skip_tts.lower() in ('true', '1', 'yes', 'on')
     if isinstance(wait_for_conch, str):
         wait_for_conch = wait_for_conch.lower() in ('true', '1', 'yes', 'on')
-    if isinstance(wait_for_ptt, str):
-        wait_for_ptt = wait_for_ptt.lower() in ('true', '1', 'yes', 'on')
 
     # Convert vad_aggressiveness to integer if provided as string
     if vad_aggressiveness is not None and isinstance(vad_aggressiveness, str):
@@ -1526,25 +1522,24 @@ consult the MCP resources listed above.
                 # Brief pause before listening
                 await asyncio.sleep(0.5)
 
-                # If push-to-talk mode is enabled, wait for start signal
-                if wait_for_ptt:
-                    logger.info("⏳ Waiting for push-to-talk start signal (touch ~/.voicemode/push-to-talk-start)...")
-                    ptt_wait_start = time.perf_counter()
-                    ptt_started = False
-                    while (time.perf_counter() - ptt_wait_start) < PTT_START_TIMEOUT:
-                        try:
-                            if PTT_START_FILE.exists():
-                                PTT_START_FILE.unlink()
-                                logger.info("🎤 Push-to-talk start signal received -- beginning recording")
-                                ptt_started = True
-                                break
-                        except OSError as ptt_err:
-                            logger.warning(f"Error checking push-to-talk start file: {ptt_err}")
-                        await asyncio.sleep(0.1)  # Check every 100ms
+                # Always wait for push-to-talk start signal
+                logger.info("⏳ Waiting for push-to-talk start signal (touch ~/.voicemode/push-to-talk-start)...")
+                ptt_wait_start = time.perf_counter()
+                ptt_started = False
+                while (time.perf_counter() - ptt_wait_start) < PTT_START_TIMEOUT:
+                    try:
+                        if PTT_START_FILE.exists():
+                            PTT_START_FILE.unlink()
+                            logger.info("🎤 Push-to-talk start signal received -- beginning recording")
+                            ptt_started = True
+                            break
+                    except OSError as ptt_err:
+                        logger.warning(f"Error checking push-to-talk start file: {ptt_err}")
+                    await asyncio.sleep(0.1)  # Check every 100ms
 
-                    if not ptt_started:
-                        logger.warning(f"Push-to-talk start timeout after {PTT_START_TIMEOUT}s")
-                        return f"Push-to-talk timeout: No start signal received within {PTT_START_TIMEOUT}s"
+                if not ptt_started:
+                    logger.warning(f"Push-to-talk start timeout after {PTT_START_TIMEOUT}s")
+                    return f"Push-to-talk timeout: No start signal received within {PTT_START_TIMEOUT}s"
 
                 # Play "listening" feedback sound
                 await play_audio_feedback(
