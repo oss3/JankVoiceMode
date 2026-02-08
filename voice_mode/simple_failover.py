@@ -78,7 +78,7 @@ async def simple_tts_failover(
         client = AsyncOpenAI(
             api_key=api_key,
             base_url=base_url,
-            timeout=30.0,  # Reasonable timeout
+            timeout=120.0,  # Extended for slow TTS like Chatterbox
             max_retries=max_retries
         )
 

@@ -226,6 +226,10 @@ def load_voicemode_env():
 # Silence after chime in seconds - prevents cutoff (default: 0.2)
 # VOICEMODE_CHIME_TRAILING_SILENCE=0.2
 
+# Push-to-talk mode as default for all converse calls (true/false, default: true)
+# When true, recording waits for push-to-talk signal before starting
+# VOICEMODE_DEFAULT_WAIT_FOR_PTT=true
+
 #############
 # Audio Format Configuration
 #############
@@ -646,6 +650,10 @@ PTT_START_FILE = BASE_DIR / "push-to-talk-start"
 PTT_STOP_FILE = BASE_DIR / "push-to-talk-stop"
 PTT_START_TIMEOUT = float(os.getenv("VOICEMODE_PTT_START_TIMEOUT", "300"))  # Max seconds to wait for PTT start (5 min default)
 
+# Default push-to-talk mode for converse tool
+# When true, the converse tool defaults to wait_for_ptt=True unless explicitly overridden
+DEFAULT_WAIT_FOR_PTT = os.getenv("VOICEMODE_DEFAULT_WAIT_FOR_PTT", "true").lower() in ('true', '1', 'yes', 'on')
+
 # Default listen duration for converse tool
 DEFAULT_LISTEN_DURATION = float(os.getenv("VOICEMODE_DEFAULT_LISTEN_DURATION", "120.0"))  # Default 120s listening time
 
@@ -725,6 +733,43 @@ STREAMING_ENABLED = os.getenv("VOICEMODE_STREAMING_ENABLED", "true").lower() in 
 STREAM_CHUNK_SIZE = int(os.getenv("VOICEMODE_STREAM_CHUNK_SIZE", "4096"))  # Download chunk size
 STREAM_BUFFER_MS = int(os.getenv("VOICEMODE_STREAM_BUFFER_MS", "150"))  # Initial buffer before playback
 STREAM_MAX_BUFFER = float(os.getenv("VOICEMODE_STREAM_MAX_BUFFER", "2.0"))  # Max buffer in seconds
+
+# ==================== DSP CONFIGURATION ====================
+
+# Audio DSP processing chain for TTS output
+# Chain: Input -> EQ -> LA-2A Leveler -> Compressor -> Limiter -> Output
+DSP_ENABLED = os.getenv("VOICEMODE_DSP_ENABLED", "true").lower() in ("true", "1", "yes", "on")
+
+# Pre-gain before processing (dB)
+DSP_PRE_GAIN_DB = float(os.getenv("VOICEMODE_DSP_PRE_GAIN_DB", "0.0"))
+
+# 3-band EQ settings (dB)
+DSP_EQ_LOW_GAIN_DB = float(os.getenv("VOICEMODE_DSP_EQ_LOW_DB", "-2.0"))  # Cut mud
+DSP_EQ_MID_GAIN_DB = float(os.getenv("VOICEMODE_DSP_EQ_MID_DB", "0.0"))
+DSP_EQ_HIGH_GAIN_DB = float(os.getenv("VOICEMODE_DSP_EQ_HIGH_DB", "1.5"))  # Add presence
+
+# LA-2A style leveling amplifier (optical compressor)
+DSP_LEVELER_ENABLED = os.getenv("VOICEMODE_DSP_LEVELER_ENABLED", "true").lower() in ("true", "1", "yes", "on")
+DSP_LEVELER_GAIN_DB = float(os.getenv("VOICEMODE_DSP_LEVELER_GAIN_DB", "6.0"))  # Output gain
+DSP_LEVELER_PEAK_REDUCTION = float(os.getenv("VOICEMODE_DSP_LEVELER_PEAK_REDUCTION", "4.0"))  # Amount of leveling
+
+# Compressor settings
+DSP_COMPRESSOR_ENABLED = os.getenv("VOICEMODE_DSP_COMPRESSOR_ENABLED", "true").lower() in ("true", "1", "yes", "on")
+DSP_COMPRESSOR_THRESHOLD_DB = float(os.getenv("VOICEMODE_DSP_COMPRESSOR_THRESHOLD_DB", "-18.0"))
+DSP_COMPRESSOR_RATIO = float(os.getenv("VOICEMODE_DSP_COMPRESSOR_RATIO", "3.0"))
+DSP_COMPRESSOR_ATTACK_MS = float(os.getenv("VOICEMODE_DSP_COMPRESSOR_ATTACK_MS", "10.0"))
+DSP_COMPRESSOR_RELEASE_MS = float(os.getenv("VOICEMODE_DSP_COMPRESSOR_RELEASE_MS", "100.0"))
+DSP_COMPRESSOR_MAKEUP_DB = float(os.getenv("VOICEMODE_DSP_COMPRESSOR_MAKEUP_DB", "0.0"))
+
+# Limiter settings (always last in chain)
+DSP_LIMITER_ENABLED = os.getenv("VOICEMODE_DSP_LIMITER_ENABLED", "true").lower() in ("true", "1", "yes", "on")
+DSP_LIMITER_CEILING_DB = float(os.getenv("VOICEMODE_DSP_LIMITER_CEILING_DB", "-1.0"))
+DSP_LIMITER_RELEASE_MS = float(os.getenv("VOICEMODE_DSP_LIMITER_RELEASE_MS", "50.0"))
+
+# Final output gain (attenuation only, clamped to <= 0 dB)
+# Use this to turn down overall output if it's too hot after limiting
+_output_gain = float(os.getenv("VOICEMODE_DSP_OUTPUT_GAIN_DB", "0.0"))
+DSP_OUTPUT_GAIN_DB = min(0.0, _output_gain)  # Only attenuation allowed
 
 # ==================== EVENT LOGGING CONFIGURATION ====================
 

@@ -2,6 +2,8 @@
 
 This module provides a queue-based audio playback system that allows multiple
 concurrent audio streams without blocking or interference.
+
+Includes optional DSP processing (EQ, compression, limiting) for TTS output.
 """
 
 import logging
@@ -11,6 +13,8 @@ from typing import Optional
 
 import numpy as np
 import sounddevice as sd
+
+from voice_mode.dsp import DSPChain, DSPConfig, get_default_chain
 
 logger = logging.getLogger("voicemode.audio_player")
 
@@ -29,17 +33,20 @@ class NonBlockingAudioPlayer:
         player.wait()  # Wait for playback to complete
     """
 
-    def __init__(self, buffer_size: int = 2048):
+    def __init__(self, buffer_size: int = 2048, dsp_enabled: bool = True):
         """Initialize the audio player.
 
         Args:
             buffer_size: Size of audio buffer chunks for callback (default: 2048)
+            dsp_enabled: Enable DSP processing (EQ, compression, limiting)
         """
         self.buffer_size = buffer_size
         self.audio_queue: Optional[queue.Queue] = None
         self.stream: Optional[sd.OutputStream] = None
         self.playback_complete = threading.Event()
         self.playback_error: Optional[Exception] = None
+        self.dsp_enabled = dsp_enabled
+        self.dsp_chain: Optional[DSPChain] = None
 
     def _audio_callback(self, outdata, frames, time_info, status):
         """Callback function called by sounddevice for each audio buffer.
@@ -109,6 +116,19 @@ class NonBlockingAudioPlayer:
         # Ensure samples are float32
         if samples.dtype != np.float32:
             samples = samples.astype(np.float32)
+
+        # Apply DSP processing (EQ, compression, limiting)
+        if self.dsp_enabled:
+            try:
+                if self.dsp_chain is None:
+                    self.dsp_chain = get_default_chain()
+                    # Update sample rate if needed
+                    if self.dsp_chain.config.sample_rate != sample_rate:
+                        self.dsp_chain.config.sample_rate = sample_rate
+                        self.dsp_chain._init_processors()
+                samples = self.dsp_chain.process(samples)
+            except Exception as e:
+                logger.warning(f"DSP processing failed, using raw audio: {e}")
 
         # Determine number of channels
         if samples.ndim == 1:
