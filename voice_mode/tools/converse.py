@@ -66,14 +66,11 @@ from voice_mode.config import (
     CONCH_ENABLED,
     CONCH_TIMEOUT,
     CONCH_CHECK_INTERVAL,
-    PTT_START_FILE,
-    PTT_STOP_FILE,
-    PTT_TOGGLE_FILE,
     PTT_START_TIMEOUT
 )
 import voice_mode.config
 from voice_mode.provider_discovery import provider_registry
-from voice_mode.ptt_client import PTTClient, PTTState
+from voice_mode.ptt_client import PTTClient, PTTState, PTTDaemonNotRunning, get_ptt_client
 from voice_mode.core import (
     get_openai_clients,
     text_to_speech,
@@ -104,27 +101,6 @@ logger = logging.getLogger("voicemode")
 # Log silence detection config at module load time
 logger.info(f"Module loaded with DISABLE_SILENCE_DETECTION={DISABLE_SILENCE_DETECTION}")
 
-# PTT Daemon client (lazy initialized)
-_ptt_client: Optional[PTTClient] = None
-_ptt_daemon_available: Optional[bool] = None
-
-def get_ptt_client() -> Optional[PTTClient]:
-    """Get the PTT client, initializing if needed. Returns None if daemon unavailable."""
-    global _ptt_client, _ptt_daemon_available
-
-    if _ptt_daemon_available is False:
-        return None
-
-    if _ptt_client is None:
-        _ptt_client = PTTClient()
-        _ptt_daemon_available = _ptt_client.is_daemon_running()
-        if _ptt_daemon_available:
-            logger.info("PTT daemon connected")
-        else:
-            logger.debug("PTT daemon not running, using file-based fallback")
-            _ptt_client = None
-
-    return _ptt_client
 
 
 # DJ Ducking Configuration
@@ -932,34 +908,18 @@ def record_audio_with_silence_detection(max_duration: float, disable_silence_det
                 logger.debug("Started continuous audio stream")
                 
                 while recording_duration < max_duration and not stop_recording:
-                    # Push-to-talk stop: check daemon status or file-based signals
+                    # Push-to-talk stop: check PTT daemon state
                     ptt_stop_detected = False
                     ptt = get_ptt_client()
 
-                    if ptt:
-                        # Check PTT daemon state - if not listening anymore, stop
-                        try:
-                            status = ptt.status()
-                            if status != PTTState.LISTENING:
-                                logger.info(f"PTT daemon: state changed to {status.value} -- stopping recording")
-                                ptt_stop_detected = True
-                        except Exception as ptt_err:
-                            logger.warning(f"PTT daemon error: {ptt_err}")
-                    else:
-                        # Fallback: check file-based signals
-                        try:
-                            # Check toggle file first (unified PTT button)
-                            if PTT_TOGGLE_FILE.exists():
-                                PTT_TOGGLE_FILE.unlink()
-                                logger.info("Push-to-talk toggle signal received -- stopping recording")
-                                ptt_stop_detected = True
-                            # Also check legacy stop file for backwards compatibility
-                            elif PTT_STOP_FILE.exists():
-                                PTT_STOP_FILE.unlink()
-                                logger.info("Push-to-talk stop signal received -- stopping recording")
-                                ptt_stop_detected = True
-                        except OSError as ptt_err:
-                            logger.warning(f"Error checking push-to-talk file: {ptt_err}")
+                    # Check PTT daemon state - if not listening anymore, stop
+                    try:
+                        status = ptt.status()
+                        if status != PTTState.LISTENING:
+                            logger.info(f"PTT daemon: state changed to {status.value} -- stopping recording")
+                            ptt_stop_detected = True
+                    except Exception as ptt_err:
+                        logger.warning(f"PTT daemon error: {ptt_err}")
 
                     if ptt_stop_detected:
                         stop_recording = True
@@ -1585,44 +1545,26 @@ consult the MCP resources listed above.
                     logger.info("🎤 TTS was interrupted by PTT - starting recording immediately")
                     ptt_started = True
                 else:
-                    # Wait for push-to-talk start signal
+                    # Wait for push-to-talk start signal via PTT daemon
                     ptt_wait_start = time.perf_counter()
                     ptt_started = False
                     ptt = get_ptt_client()
 
-                    if ptt:
-                        # Use PTT daemon - just poll status until it changes to listening
-                        logger.info("⏳ Waiting for push-to-talk signal (PTT daemon)...")
-                        while (time.perf_counter() - ptt_wait_start) < PTT_START_TIMEOUT:
-                            try:
-                                status = ptt.status()
-                                if status == PTTState.LISTENING:
-                                    logger.info("🎤 PTT daemon: listening state detected -- beginning recording")
-                                    ptt_started = True
-                                    break
-                            except Exception as ptt_err:
-                                logger.warning(f"PTT daemon error: {ptt_err}")
-                            await asyncio.sleep(0.1)
-                    else:
-                        # Fallback to file-based PTT
-                        logger.info("⏳ Waiting for push-to-talk signal (touch ~/.voicemode/push-to-talk-toggle or push-to-talk-start)...")
-                        while (time.perf_counter() - ptt_wait_start) < PTT_START_TIMEOUT:
-                            try:
-                                # Check toggle file first (unified PTT button)
-                                if PTT_TOGGLE_FILE.exists():
-                                    PTT_TOGGLE_FILE.unlink()
-                                    logger.info("🎤 Push-to-talk toggle signal received -- beginning recording")
-                                    ptt_started = True
-                                    break
-                                # Also check legacy start file for backwards compatibility
-                                if PTT_START_FILE.exists():
-                                    PTT_START_FILE.unlink()
-                                    logger.info("🎤 Push-to-talk start signal received -- beginning recording")
-                                    ptt_started = True
-                                    break
-                            except OSError as ptt_err:
-                                logger.warning(f"Error checking push-to-talk file: {ptt_err}")
-                            await asyncio.sleep(0.1)  # Check every 100ms
+                    # Check if daemon is running
+                    if not ptt.is_daemon_running():
+                        return "PTT daemon not running. Start with: cd ~/Dev/code/JankSDK/elixir && mix run --no-halt"
+
+                    logger.info("⏳ Waiting for push-to-talk signal (PTT daemon)...")
+                    while (time.perf_counter() - ptt_wait_start) < PTT_START_TIMEOUT:
+                        try:
+                            status = ptt.status()
+                            if status == PTTState.LISTENING:
+                                logger.info("🎤 PTT daemon: listening state detected -- beginning recording")
+                                ptt_started = True
+                                break
+                        except Exception as ptt_err:
+                            logger.warning(f"PTT daemon error: {ptt_err}")
+                        await asyncio.sleep(0.1)
 
                 if not ptt_started:
                     logger.warning(f"Push-to-talk start timeout after {PTT_START_TIMEOUT}s")

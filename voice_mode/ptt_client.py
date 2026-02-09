@@ -12,14 +12,16 @@ The daemon runs at ~/.voicemode/ptt.sock and supports:
 - SUBSCRIBE: Subscribe to state change events
 
 States: idle, listening, speaking
+
+IMPORTANT: The PTT daemon MUST be running. There is no file-based fallback.
+Start the daemon with: cd ~/Dev/code/JankSDK/elixir && mix run --no-halt
 """
 
-import asyncio
 import logging
 import os
 import socket
 import threading
-from pathlib import Path
+import time
 from typing import Callable, Optional
 from dataclasses import dataclass
 from enum import Enum
@@ -32,6 +34,11 @@ class PTTState(Enum):
     LISTENING = "listening"
     SPEAKING = "speaking"
     UNKNOWN = "unknown"
+
+
+class PTTDaemonNotRunning(Exception):
+    """Raised when the PTT daemon is not running."""
+    pass
 
 
 @dataclass
@@ -62,6 +69,13 @@ class PTTClient:
             return result in ("idle", "listening", "speaking")
         except Exception:
             return False
+
+    def require_daemon(self) -> None:
+        """Raise PTTDaemonNotRunning if daemon is not available."""
+        if not self.is_daemon_running():
+            raise PTTDaemonNotRunning(
+                "PTT daemon not running. Start with: cd ~/Dev/code/JankSDK/elixir && mix run --no-halt"
+            )
 
     def toggle(self) -> PTTState:
         """Toggle PTT state.
@@ -191,7 +205,7 @@ class PTTClient:
             except Exception as e:
                 if self._subscriber_running:
                     logger.debug(f"PTT subscriber connection error: {e}, reconnecting...")
-                    asyncio.sleep(1.0)
+                    time.sleep(1.0)
             finally:
                 if self._subscriber_socket:
                     try:
@@ -210,73 +224,16 @@ class PTTClient:
                 self._subscriber_callback(PTTState.UNKNOWN, new_state)
 
 
-class PTTFileClient:
-    """Fallback PTT client using file-based signaling.
-
-    Used when the Elixir daemon is not running.
-    """
-
-    def __init__(self, base_dir: str = "~/.voicemode"):
-        self.base_dir = Path(os.path.expanduser(base_dir))
-        self.toggle_file = self.base_dir / "push-to-talk-toggle"
-        self.start_file = self.base_dir / "push-to-talk-start"
-        self.stop_file = self.base_dir / "push-to-talk-stop"
-        self._state = PTTState.IDLE
-
-    def is_daemon_running(self) -> bool:
-        """File-based client is always 'running'."""
-        return True
-
-    def toggle(self) -> PTTState:
-        """Toggle using file check."""
-        if self._state == PTTState.IDLE:
-            self._state = PTTState.LISTENING
-        else:
-            self._state = PTTState.IDLE
-        return self._state
-
-    def check_toggle_file(self) -> bool:
-        """Check if toggle file exists and delete it."""
-        if self.toggle_file.exists():
-            try:
-                self.toggle_file.unlink()
-                return True
-            except Exception:
-                pass
-        return False
-
-    def check_start_file(self) -> bool:
-        """Check if start file exists and delete it."""
-        if self.start_file.exists():
-            try:
-                self.start_file.unlink()
-                return True
-            except Exception:
-                pass
-        return False
-
-    def check_stop_file(self) -> bool:
-        """Check if stop file exists and delete it."""
-        if self.stop_file.exists():
-            try:
-                self.stop_file.unlink()
-                return True
-            except Exception:
-                pass
-        return False
-
-    def status(self) -> PTTState:
-        return self._state
+# Module-level singleton
+_client: Optional[PTTClient] = None
 
 
 def get_ptt_client() -> PTTClient:
-    """Get a PTT client, preferring the daemon if available."""
-    client = PTTClient()
-    if client.is_daemon_running():
-        logger.info("Using PTT daemon")
-        return client
-    else:
-        logger.info("PTT daemon not running, using file-based fallback")
-        # Return the file-based client as fallback
-        # Note: This has a different interface, callers need to handle both
-        return PTTFileClient()
+    """Get the singleton PTT client.
+
+    Raises PTTDaemonNotRunning if daemon is not available.
+    """
+    global _client
+    if _client is None:
+        _client = PTTClient()
+    return _client
