@@ -4,12 +4,17 @@ This module provides a queue-based audio playback system that allows multiple
 concurrent audio streams without blocking or interference.
 
 Includes optional DSP processing (EQ, compression, limiting) for TTS output.
+
+Supports PTT (push-to-talk) interrupt: if the user triggers PTT during playback,
+audio stops immediately so they can start speaking.
 """
 
 import logging
 import queue
 import threading
-from typing import Optional
+import time
+from pathlib import Path
+from typing import Optional, Tuple
 
 import numpy as np
 import sounddevice as sd
@@ -17,6 +22,10 @@ import sounddevice as sd
 from voice_mode.dsp import DSPChain, DSPConfig, get_default_chain
 
 logger = logging.getLogger("voicemode.audio_player")
+
+# PTT file paths (same as in config.py, but we avoid circular import)
+PTT_START_FILE = Path.home() / ".voicemode" / "push-to-talk-start"
+PTT_TOGGLE_FILE = Path.home() / ".voicemode" / "push-to-talk-toggle"
 
 
 class NonBlockingAudioPlayer:
@@ -204,3 +213,83 @@ class NonBlockingAudioPlayer:
                     self.audio_queue.get_nowait()
                 except queue.Empty:
                     break
+
+    def wait_with_ptt_interrupt(
+        self,
+        timeout: Optional[float] = None,
+        poll_interval: float = 0.05
+    ) -> Tuple[bool, bool]:
+        """Wait for playback to complete, but stop early if PTT is triggered.
+
+        This allows users to interrupt TTS playback by pressing their PTT button,
+        which is useful when they've already read the text and want to respond.
+
+        Checks for both:
+        - PTT_TOGGLE_FILE (unified toggle, deleted on detection)
+        - PTT_START_FILE (legacy start file, NOT deleted - consumed by recording logic)
+
+        When PTT toggle is detected during playback, the toggle file is deleted
+        and ptt_interrupted is set to True. The caller can then skip the PTT
+        wait loop and start recording immediately.
+
+        Args:
+            timeout: Maximum time to wait in seconds (None = wait forever)
+            poll_interval: How often to check for PTT signal (default: 50ms)
+
+        Returns:
+            Tuple of (playback_completed, ptt_interrupted):
+                - playback_completed: True if playback finished naturally
+                - ptt_interrupted: True if playback was stopped due to PTT
+
+        Raises:
+            Exception: If playback error occurred
+        """
+        start_time = time.time()
+        ptt_interrupted = False
+
+        while True:
+            # Check if playback completed naturally
+            if self.playback_complete.is_set():
+                break
+
+            # Check for timeout
+            if timeout is not None:
+                elapsed = time.time() - start_time
+                if elapsed >= timeout:
+                    logger.warning("Playback wait timed out")
+                    break
+
+            # Check for PTT interrupt signal (toggle file takes precedence)
+            try:
+                if PTT_TOGGLE_FILE.exists():
+                    logger.info("PTT toggle detected during TTS playback - interrupting audio")
+                    # Delete the toggle file to signal it was consumed during TTS
+                    # The caller will know to skip PTT wait since ptt_interrupted=True
+                    PTT_TOGGLE_FILE.unlink()
+                    ptt_interrupted = True
+                    self.stop()
+                    break
+                elif PTT_START_FILE.exists():
+                    logger.info("PTT start detected during TTS playback - interrupting audio")
+                    # Don't delete the start file - let the recording logic consume it
+                    ptt_interrupted = True
+                    self.stop()
+                    break
+            except OSError as e:
+                logger.debug(f"Error checking PTT file: {e}")
+
+            # Brief sleep before next check
+            time.sleep(poll_interval)
+
+        # Stop and close stream if still active
+        if self.stream:
+            self.stream.stop()
+            self.stream.close()
+            self.stream = None
+
+        # Raise any error that occurred during playback
+        if self.playback_error:
+            raise self.playback_error
+
+        playback_completed = self.playback_complete.is_set() and not ptt_interrupted
+        return playback_completed, ptt_interrupted

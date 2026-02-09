@@ -24,6 +24,8 @@ from .config import (
     STREAM_BUFFER_MS,
     STREAM_MAX_BUFFER,
     SAMPLE_RATE,
+    PTT_TOGGLE_FILE,
+    PTT_START_FILE,
     logger
 )
 from .utils import get_event_logger, update_latest_symlinks
@@ -40,6 +42,27 @@ class StreamMetrics:
     chunks_received: int = 0
     chunks_played: int = 0
     audio_path: Optional[str] = None  # Path to saved audio file
+    ptt_interrupted: bool = False  # True if playback was interrupted by PTT
+
+
+def check_ptt_interrupt() -> bool:
+    """Check if PTT toggle or start file exists (interrupt signal).
+
+    Returns True if PTT was triggered, consuming the toggle file.
+    Start file is NOT consumed - it's left for the recording logic.
+    """
+    try:
+        if PTT_TOGGLE_FILE.exists():
+            logger.info("PTT toggle detected during streaming - interrupting")
+            PTT_TOGGLE_FILE.unlink()
+            return True
+        if PTT_START_FILE.exists():
+            logger.info("PTT start detected during streaming - interrupting")
+            # Don't delete start file - let recording logic consume it
+            return True
+    except OSError as e:
+        logger.debug(f"Error checking PTT file: {e}")
+    return False
 
 
 class AudioStreamPlayer:
@@ -276,40 +299,69 @@ async def stream_pcm_audio(
         ) as response:
             chunk_count = 0
             bytes_received = 0
-            
-            # Stream chunks as they arrive
-            async for chunk in response.iter_bytes(chunk_size=STREAM_CHUNK_SIZE):
-                if chunk:
-                    # Track first chunk received
-                    if first_chunk_time is None:
-                        first_chunk_time = time.perf_counter()
-                        chunk_receive_time = first_chunk_time - start_time
-                        logger.info(f"First audio chunk received after {chunk_receive_time:.3f}s")
-                        
-                        # Log TTS first audio event
-                        event_logger = get_event_logger()
-                        if event_logger:
-                            event_logger.log_event(event_logger.TTS_FIRST_AUDIO)
-                    
-                    # Convert bytes to numpy array for sounddevice
-                    # PCM data is already in the right format
-                    audio_array = np.frombuffer(chunk, dtype=np.int16)
-                    
-                    # Play the chunk immediately
-                    stream.write(audio_array)
-                    
-                    # Save chunk if enabled
-                    if save_buffer:
-                        save_buffer.write(chunk)
-                    
-                    chunk_count += 1
-                    bytes_received += len(chunk)
-                    metrics.chunks_received = chunk_count
-                    metrics.chunks_played = chunk_count
-                    
-                    if debug and chunk_count % 10 == 0:
-                        logger.debug(f"Streamed {chunk_count} chunks, {bytes_received} bytes")
-        
+            ptt_interrupted = False
+            stop_streaming = asyncio.Event()
+
+            async def ptt_monitor():
+                """Background task to monitor for PTT interrupt."""
+                while not stop_streaming.is_set():
+                    if check_ptt_interrupt():
+                        stop_streaming.set()
+                        return
+                    await asyncio.sleep(0.05)  # Check every 50ms
+
+            # Start PTT monitor in background
+            ptt_task = asyncio.create_task(ptt_monitor())
+
+            try:
+                # Stream chunks as they arrive
+                async for chunk in response.iter_bytes(chunk_size=STREAM_CHUNK_SIZE):
+                    # Check if PTT monitor signaled stop
+                    if stop_streaming.is_set():
+                        ptt_interrupted = True
+                        metrics.ptt_interrupted = True
+                        logger.info("Streaming interrupted by PTT")
+                        break
+
+                    if chunk:
+                        # Track first chunk received
+                        if first_chunk_time is None:
+                            first_chunk_time = time.perf_counter()
+                            chunk_receive_time = first_chunk_time - start_time
+                            logger.info(f"First audio chunk received after {chunk_receive_time:.3f}s")
+
+                            # Log TTS first audio event
+                            event_logger = get_event_logger()
+                            if event_logger:
+                                event_logger.log_event(event_logger.TTS_FIRST_AUDIO)
+
+                        # Convert bytes to numpy array for sounddevice
+                        # PCM data is already in the right format
+                        audio_array = np.frombuffer(chunk, dtype=np.int16)
+
+                        # Play the chunk immediately
+                        stream.write(audio_array)
+
+                        # Save chunk if enabled
+                        if save_buffer:
+                            save_buffer.write(chunk)
+
+                        chunk_count += 1
+                        bytes_received += len(chunk)
+                        metrics.chunks_received = chunk_count
+                        metrics.chunks_played = chunk_count
+
+                        if debug and chunk_count % 10 == 0:
+                            logger.debug(f"Streamed {chunk_count} chunks, {bytes_received} bytes")
+            finally:
+                # Stop PTT monitor
+                stop_streaming.set()
+                ptt_task.cancel()
+                try:
+                    await ptt_task
+                except asyncio.CancelledError:
+                    pass
+
         # Wait for playback to finish
         stream.stop()
         
@@ -482,22 +534,31 @@ async def stream_with_buffering(
         ) as response:
             first_chunk_time = None
             
+            ptt_interrupted = False
+
             # Stream chunks as they arrive
             async for chunk in response.iter_bytes(chunk_size=STREAM_CHUNK_SIZE):
+                # Check for PTT interrupt before processing each chunk
+                if check_ptt_interrupt():
+                    ptt_interrupted = True
+                    metrics.ptt_interrupted = True
+                    logger.info("Buffered streaming interrupted by PTT")
+                    break
+
                 if chunk:
                     # Track first chunk for TTFA
                     if first_chunk_time is None:
                         first_chunk_time = time.perf_counter()
                         metrics.ttfa = first_chunk_time - start_time
                         logger.info(f"First chunk received - TTFA: {metrics.ttfa:.3f}s")
-                    
+
                     buffer.write(chunk)
                     metrics.chunks_received += 1
-                    
+
                     # Also accumulate in save buffer if saving is enabled
                     if save_buffer:
                         save_buffer.write(chunk)
-                    
+
                     # Try to decode when we have enough data (e.g., 32KB)
                     if buffer.tell() > 32768 and not audio_started:
                         buffer.seek(0)

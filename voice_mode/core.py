@@ -283,16 +283,21 @@ async def text_to_speech(
                 metrics['ttfa'] = stream_metrics.ttfa
                 metrics['generation'] = stream_metrics.generation_time
                 metrics['playback'] = stream_metrics.playback_time - stream_metrics.generation_time
-                
+
                 # Pass through audio path if it exists
                 if stream_metrics.audio_path:
                     metrics['audio_path'] = stream_metrics.audio_path
-                
+
+                # Pass through PTT interrupt flag
+                if stream_metrics.ptt_interrupted:
+                    metrics['ptt_interrupted'] = True
+                    logger.info("TTS streaming was interrupted by PTT - user wants to speak")
+
                 logger.info(f"✓ TTS streamed successfully - TTFA: {metrics['ttfa']:.3f}s")
-                
+
                 # Save debug files if needed (we'd need to capture the full audio)
                 # For now, skip debug saving in streaming mode
-                
+
                 return True, metrics
             else:
                 logger.warning("Streaming failed, falling back to buffered playback")
@@ -423,9 +428,14 @@ async def text_to_speech(
                             samples_with_buffer = np.vstack([silence, samples])
 
                         # Use non-blocking audio player for concurrent playback support
+                        # Enable PTT interrupt so users can skip TTS by pressing their PTT button
                         player = NonBlockingAudioPlayer()
                         player.play(samples_with_buffer, audio.frame_rate, blocking=False)
-                        player.wait()
+                        playback_completed, ptt_interrupted = player.wait_with_ptt_interrupt()
+
+                        if ptt_interrupted:
+                            logger.info("TTS playback interrupted by PTT - user wants to speak")
+                            metrics['ptt_interrupted'] = True
                         
                         playback_end = time.perf_counter()
                         metrics['playback'] = playback_end - playback_start

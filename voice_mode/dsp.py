@@ -11,6 +11,7 @@ This module provides broadcast-style processing to improve TTS audio:
 
 import logging
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Optional
 
 import numpy as np
@@ -22,6 +23,14 @@ except ImportError:
     SCIPY_AVAILABLE = False
 
 logger = logging.getLogger("voicemode.dsp")
+
+# Set up dedicated DSP log file so levels are visible even when running as MCP
+_dsp_log_file = Path.home() / ".voicemode" / "logs" / "dsp.log"
+_dsp_log_file.parent.mkdir(parents=True, exist_ok=True)
+_dsp_handler = logging.FileHandler(_dsp_log_file, mode='a')
+_dsp_handler.setFormatter(logging.Formatter('%(asctime)s - %(message)s'))
+logger.addHandler(_dsp_handler)
+logger.setLevel(logging.INFO)
 
 
 @dataclass
@@ -313,6 +322,12 @@ class DSPChain:
         if samples.dtype != np.float32:
             samples = samples.astype(np.float32)
 
+        # Calculate input RMS for logging
+        input_rms = np.sqrt(np.mean(samples ** 2))
+        input_rms_db = linear_to_db(input_rms) if input_rms > 0 else -100.0
+        input_peak = np.max(np.abs(samples))
+        input_peak_db = linear_to_db(input_peak) if input_peak > 0 else -100.0
+
         # Pre-gain
         if self.config.pre_gain_db != 0:
             samples = samples * db_to_linear(self.config.pre_gain_db)
@@ -359,6 +374,18 @@ class DSPChain:
         if self.config.output_gain_db < 0:
             samples = samples * db_to_linear(self.config.output_gain_db)
 
+        # Calculate output RMS for logging
+        output_rms = np.sqrt(np.mean(samples ** 2))
+        output_rms_db = linear_to_db(output_rms) if output_rms > 0 else -100.0
+        output_peak = np.max(np.abs(samples))
+        output_peak_db = linear_to_db(output_peak) if output_peak > 0 else -100.0
+
+        logger.info(
+            f"DSP: input RMS={input_rms_db:.1f}dB peak={input_peak_db:.1f}dB → "
+            f"output RMS={output_rms_db:.1f}dB peak={output_peak_db:.1f}dB "
+            f"(gain={output_rms_db - input_rms_db:+.1f}dB)"
+        )
+
         return samples.astype(np.float32)
 
 
@@ -371,7 +398,7 @@ def load_config_from_voicemode() -> DSPConfig:
     try:
         from voice_mode import config as vm_config
 
-        return DSPConfig(
+        config = DSPConfig(
             enabled=getattr(vm_config, 'DSP_ENABLED', True),
             pre_gain_db=getattr(vm_config, 'DSP_PRE_GAIN_DB', 0.0),
             eq_low_gain_db=getattr(vm_config, 'DSP_EQ_LOW_GAIN_DB', -2.0),
@@ -391,6 +418,16 @@ def load_config_from_voicemode() -> DSPConfig:
             limiter_release_ms=getattr(vm_config, 'DSP_LIMITER_RELEASE_MS', 50.0),
             output_gain_db=min(0.0, getattr(vm_config, 'DSP_OUTPUT_GAIN_DB', 0.0)),  # Clamp to <= 0
         )
+
+        # Log DSP config on load
+        logger.info(
+            f"DSP config loaded: enabled={config.enabled}, "
+            f"pre_gain={config.pre_gain_db}dB, "
+            f"leveler_gain={config.leveler_gain_db}dB (peak_red={config.leveler_peak_reduction}), "
+            f"comp_makeup={config.compressor_makeup_db}dB, "
+            f"limiter_ceiling={config.limiter_ceiling_db}dB"
+        )
+        return config
     except ImportError:
         logger.warning("Could not load voicemode config, using defaults")
         return DSPConfig()

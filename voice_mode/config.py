@@ -648,6 +648,12 @@ INITIAL_SILENCE_GRACE_PERIOD = float(os.getenv("VOICEMODE_INITIAL_SILENCE_GRACE_
 # Create with: touch ~/.voicemode/push-to-talk-start (or -stop)
 PTT_START_FILE = BASE_DIR / "push-to-talk-start"
 PTT_STOP_FILE = BASE_DIR / "push-to-talk-stop"
+# Unified toggle file - single button for all PTT actions:
+# - During TTS playback: interrupts playback and starts listening immediately
+# - During recording: stops recording
+# - While waiting for PTT: starts recording
+# Create with: touch ~/.voicemode/push-to-talk-toggle
+PTT_TOGGLE_FILE = BASE_DIR / "push-to-talk-toggle"
 PTT_START_TIMEOUT = float(os.getenv("VOICEMODE_PTT_START_TIMEOUT", "300"))  # Max seconds to wait for PTT start (5 min default)
 
 # Default push-to-talk mode for converse tool
