@@ -47,18 +47,16 @@ Override TTS voice selection.
 
 **Examples:**
 - OpenAI: nova, shimmer, alloy, echo, fable, onyx
-- Kokoro: af_sky, af_sarah, am_adam, ef_dora, etc.
 
 **Important:** Never use 'coral' voice.
 
 ### tts_provider
-**Type:** "openai" | "kokoro" (optional)
+**Type:** "openai" (optional)
 TTS provider selection.
 
 **When to specify:**
 - User explicitly requests provider
 - Failover testing
-- Non-English languages (usually kokoro)
 
 **Usually:** Let system auto-select.
 
@@ -101,7 +99,7 @@ Speech playback rate.
 - 1.5 = 1.5x speed
 - 2.0 = double speed
 
-**Supported by:** Both OpenAI and Kokoro
+**Supported by:** OpenAI and OpenAI-compatible endpoints
 
 ## Audio & Silence Detection
 
@@ -198,7 +196,7 @@ LiveKit room name.
 ## Endpoint Requirements
 
 STT/TTS services must expose OpenAI-compatible endpoints:
-- Whisper/Kokoro must serve on:
+- Services must serve on:
   - `/v1/audio/transcriptions` (STT)
   - `/v1/audio/speech` (TTS)
 

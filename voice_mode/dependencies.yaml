@@ -39,11 +39,6 @@
 # - Ubuntu/Debian: cmake, gcc, g++, make, portaudio19-dev, libasound2-dev
 # - Fedora: cmake, gcc, gcc-c++, make, portaudio-devel, alsa-lib-devel
 #
-# ### Kokoro (TTS)
-# - macOS: rust (optional)
-# - Ubuntu/Debian: cargo, rustc (ARM64 only)
-# - Fedora: cargo, rust (ARM64 only)
-#
 # ### LiveKit
 # - All platforms: No system dependencies (single binary)
 #
@@ -53,7 +48,7 @@
 #
 # Structure:
 #   voicemode:
-#     component:  # core, whisper, kokoro, livekit
+#     component:  # core, whisper, livekit
 #       description: What this component does
 #       os_or_distro:
 #         packages:
@@ -320,54 +315,6 @@ voicemode:
           required: true
           check_command: brew list portaudio
           install_via: homebrew
-
-  kokoro:
-    description: Kokoro TTS service dependencies
-
-    common:  # All platforms
-      packages:
-        - name: git
-          description: Version control system (needed to clone kokoro repository)
-          required: true
-          check_command: git --version
-          note: Required for installing Kokoro from GitHub repository
-
-    debian:
-      packages:
-        - name: cargo
-          description: Rust package manager (needed for building sudachipy on ARM)
-          required: false  # Only on ARM64, not x86_64
-          check_command: cargo --version
-          note: Only required for ARM64 architecture
-
-        - name: rustc
-          description: Rust compiler (needed for building sudachipy on ARM)
-          required: false  # Only on ARM64, not x86_64
-          check_command: rustc --version
-          note: Only required for ARM64 architecture
-
-    fedora:
-      packages:
-        - name: cargo
-          description: Rust package manager (needed for building sudachipy)
-          required: true
-          check_command: cargo --version
-          note: Required for building sudachipy dependency
-
-        - name: rust
-          description: Rust compiler
-          required: true
-          check_command: rustc --version
-          note: Required for building sudachipy dependency
-
-    darwin:
-      packages:
-        - name: rust
-          description: Rust compiler (if needed for building dependencies)
-          required: false
-          check_command: rustc --version
-          install_via: homebrew or rustup
-          note: kokoro-fastapi handles most deps via UV
 
   livekit:
     description: LiveKit server dependencies (optional)

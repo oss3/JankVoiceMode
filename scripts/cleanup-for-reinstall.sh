@@ -40,7 +40,7 @@ echo ""
 # 1. Stop systemd services (Linux)
 if command -v systemctl &>/dev/null; then
     log "Checking systemd services..."
-    for svc in whisper kokoro livekit; do
+    for svc in whisper livekit; do
         if systemctl --user is-active --quiet "$svc" 2>/dev/null; then
             run_cmd "systemctl --user stop $svc"
         fi
@@ -57,7 +57,7 @@ fi
 # 1b. Stop launchd services (macOS)
 if command -v launchctl &>/dev/null; then
     log "Checking launchd services..."
-    for svc in whisper kokoro livekit; do
+    for svc in whisper livekit; do
         plist="$HOME/Library/LaunchAgents/com.voicemode.${svc}.plist"
         if [[ -f "$plist" ]]; then
             run_cmd "launchctl unload '$plist' 2>/dev/null || true"

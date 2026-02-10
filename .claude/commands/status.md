@@ -14,7 +14,7 @@ Check the status of VoiceMode services.
 
 ## Description
 
-Shows the current status of VoiceMode services including Whisper (STT), Kokoro (TTS), and LiveKit (if used).
+Shows the current status of VoiceMode services including Whisper (STT) and other configured services.
 
 ## Implementation
 
@@ -32,9 +32,6 @@ Check all services:
 ```bash
 # Check Whisper (STT)
 mcp__voicemode__service service_name=whisper action=status
-
-# Check Kokoro (TTS)
-mcp__voicemode__service service_name=kokoro action=status
 
 # Check LiveKit (optional)
 mcp__voicemode__service service_name=livekit action=status

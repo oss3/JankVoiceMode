@@ -53,7 +53,7 @@ Use the `status` tool to see connected devices, then use `converse` to have a vo
 
 | Feature | Local VoiceMode | VoiceMode Connect |
 |---------|-----------------|-------------------|
-| STT/TTS | Local (Whisper/Kokoro) | Client device (phone/browser) |
+| STT/TTS | Local (Whisper/Fish Speech) | Client device (phone/browser) |
 | Setup | Install services | Just add MCP server |
 | Internet | Optional | Required |
 | Latency | Lower | Higher |

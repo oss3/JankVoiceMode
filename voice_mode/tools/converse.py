@@ -274,47 +274,6 @@ async def startup_initialization():
     logger.info("Initializing provider registry...")
     await provider_registry.initialize()
     
-    # Check if we should auto-start Kokoro
-    auto_start_kokoro = os.getenv("VOICE_MODE_AUTO_START_KOKORO", "").lower() in ("true", "1", "yes", "on")
-    if auto_start_kokoro:
-        try:
-            # Check if Kokoro is already running
-            async with httpx.AsyncClient(timeout=3.0) as client:
-                base_url = 'http://127.0.0.1:8880'  # Kokoro default
-                health_url = f"{base_url}/health"
-                response = await client.get(health_url)
-                
-                if response.status_code == 200:
-                    logger.info("Kokoro TTS is already running externally")
-                else:
-                    raise Exception("Not running")
-        except:
-            # Kokoro is not running, start it
-            logger.info("Auto-starting Kokoro TTS service...")
-            try:
-                # Import here to avoid circular dependency
-                import subprocess
-                if "kokoro" not in service_processes:
-                    process = subprocess.Popen(
-                        ["uvx", "kokoro-fastapi"],
-                        stdout=subprocess.PIPE,
-                        stderr=subprocess.PIPE,
-                        text=True,
-                        env={**os.environ}
-                    )
-                    service_processes["kokoro"] = process
-                    
-                    # Wait a moment for it to start
-                    await asyncio.sleep(2.0)
-                    
-                    # Verify it started
-                    if process.poll() is None:
-                        logger.info(f"✓ Kokoro TTS started successfully (PID: {process.pid})")
-                    else:
-                        logger.error("Failed to start Kokoro TTS")
-            except Exception as e:
-                logger.error(f"Error auto-starting Kokoro: {e}")
-    
     # Log initial status
     logger.info("Service initialization complete")
 
@@ -331,7 +290,6 @@ async def get_tts_config(provider: Optional[str] = None, voice: Optional[str] = 
     # Map provider names to base URLs
     provider_urls = {
         'openai': 'https://api.openai.com/v1',
-        'kokoro': 'http://127.0.0.1:8880/v1'
     }
 
     # Convert provider name to URL if it's a known provider
@@ -1128,7 +1086,7 @@ async def converse(
     listen_duration_min: float = 2.0,
     timeout: float = 60.0,
     voice: Optional[str] = None,
-    tts_provider: Optional[Literal["openai", "kokoro"]] = None,
+    tts_provider: Optional[Literal["openai"]] = None,
     tts_model: Optional[str] = None,
     tts_instructions: Optional[str] = None,
     chime_enabled: Optional[Union[bool, str]] = None,
@@ -1172,7 +1130,7 @@ KEY PARAMETERS:
 • listen_duration_max (number, default: 120): Max listen time in seconds
 • listen_duration_min (number, default: 2.0): Min recording time before silence detection
 • voice (string): TTS voice name (auto-selected unless specified)
-• tts_provider ("openai"|"kokoro"): Provider selection (auto-selected unless specified)
+• tts_provider ("openai"): Provider selection (auto-selected unless specified)
 • disable_silence_detection (bool, default: false): Disable auto-stop on silence
 • vad_aggressiveness (0-3, default: 2): Voice detection strictness (0=permissive, 3=strict)
 • speed (0.25-4.0): Speech rate (1.0=normal, 2.0=double speed)
@@ -1487,7 +1445,7 @@ consult the MCP resources listed above.
                         # Check if API key is missing for OpenAI
                         from voice_mode.config import OPENAI_API_KEY
                         if not OPENAI_API_KEY:
-                            result = "Error: Could not speak message. OpenAI API key is not set. Please set OPENAI_API_KEY environment variable or use local services (Kokoro TTS)."
+                            result = "Error: Could not speak message. OpenAI API key is not set. Please set OPENAI_API_KEY environment variable or configure a local TTS service."
                         else:
                             result = "Error: Could not speak message. TTS request to OpenAI failed. Please check your API key and network connection."
                     else:

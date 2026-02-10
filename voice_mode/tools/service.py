@@ -12,13 +12,12 @@ from typing import Literal, Optional, Dict, Any, Union
 import psutil
 
 from voice_mode.server import mcp
-from voice_mode.config import WHISPER_PORT, KOKORO_PORT, SERVICE_AUTO_ENABLE
+from voice_mode.config import WHISPER_PORT, SERVICE_AUTO_ENABLE
 from voice_mode.utils.services.common import find_process_by_port, check_service_status
 
 # Default port for VoiceMode serve command (HTTP MCP server)
 VOICEMODE_SERVE_PORT = 8765
 from voice_mode.utils.services.whisper_helpers import find_whisper_server, find_whisper_model
-from voice_mode.utils.services.kokoro_helpers import find_kokoro_fastapi, has_gpu_support, is_kokoro_starting_up
 
 logger = logging.getLogger("voicemode")
 
@@ -45,38 +44,6 @@ def get_service_config_vars(service_name: str) -> Dict[str, Any]:
             "HOME": home,
             "START_SCRIPT": start_script,
         }
-    elif service_name == "kokoro":
-        kokoro_dir = find_kokoro_fastapi()
-        if not kokoro_dir:
-            kokoro_dir = os.path.join(voicemode_dir, "services", "kokoro")
-
-        # Find start script
-        start_script = None
-        if platform.system() == "Darwin":
-            start_script = Path(kokoro_dir) / "start-gpu_mac.sh"
-        else:
-            # On Linux, prefer GPU script if GPU is available, otherwise use CPU script
-            if has_gpu_support():
-                possible_scripts = [
-                    Path(kokoro_dir) / "start-gpu.sh",
-                    Path(kokoro_dir) / "start-cpu.sh"
-                ]
-            else:
-                possible_scripts = [
-                    Path(kokoro_dir) / "start-cpu.sh",
-                    Path(kokoro_dir) / "start-gpu.sh"
-                ]
-
-            for script in possible_scripts:
-                if script.exists():
-                    start_script = script
-                    break
-
-        return {
-            "HOME": home,
-            "START_SCRIPT": str(start_script) if start_script and start_script.exists() else "",
-            "KOKORO_DIR": kokoro_dir,
-        }
     elif service_name == "voicemode":
         # VoiceMode serve service - runs the HTTP MCP server
         start_script = os.path.join(voicemode_dir, "services", "voicemode", "bin", "start-voicemode-serve.sh")
@@ -100,7 +67,7 @@ def get_service_config_vars(service_name: str) -> Dict[str, Any]:
 async def install_voicemode_start_script() -> Dict[str, Any]:
     """Install the VoiceMode start script to the expected location.
 
-    Unlike whisper/kokoro which require compilation, voicemode is built into
+    Unlike whisper which requires compilation, voicemode is built into
     the package. This function copies the start script template to the
     ~/.voicemode/services/voicemode/bin/ directory.
 
@@ -225,7 +192,7 @@ def create_service_file(service_name: str) -> tuple[Path, str]:
     Templates are simplified - start scripts handle config via voicemode.env.
 
     Args:
-        service_name: Name of the service (whisper, kokoro, voicemode)
+        service_name: Name of the service (whisper, voicemode)
 
     Returns:
         Tuple of (destination_path, file_content)
@@ -272,8 +239,6 @@ async def status_service(service_name: str) -> str:
     else:
         if service_name == "whisper":
             port = WHISPER_PORT
-        elif service_name == "kokoro":
-            port = KOKORO_PORT
         elif service_name == "voicemode":
             port = VOICEMODE_SERVE_PORT
         else:
@@ -282,11 +247,6 @@ async def status_service(service_name: str) -> str:
         status, proc = check_service_status(port)
 
         if status == "not_available":
-            # For Kokoro, check if it's in the process of starting up
-            if service_name == "kokoro":
-                startup_status = is_kokoro_starting_up()
-                if startup_status:
-                    return f"⏳ Kokoro is {startup_status}"
             return f"❌ {service_name.capitalize()} is not available"
         elif status == "forwarded":
             return f"""🔄 {service_name.capitalize()} is available via port forwarding
@@ -363,17 +323,6 @@ async def status_service(service_name: str) -> str:
             except:
                 pass
                 
-        elif service_name == "kokoro":
-            # Try to get version info
-            try:
-                from voice_mode.utils.services.version_info import get_kokoro_version
-                version_info = get_kokoro_version()
-                if version_info.get("api_version"):
-                    extra_info_parts.append(f"API Version: {version_info['api_version']}")
-                elif version_info.get("version"):
-                    extra_info_parts.append(f"Version: {version_info['version']}")
-            except:
-                pass
         elif service_name == "voicemode":
             # VoiceMode HTTP server info
             # Extract transport and host from command line
@@ -431,8 +380,6 @@ async def start_service(service_name: str) -> str:
     else:
         if service_name == "whisper":
             port = WHISPER_PORT
-        elif service_name == "kokoro":
-            port = KOKORO_PORT
         elif service_name == "voicemode":
             port = VOICEMODE_SERVE_PORT
         else:
@@ -521,41 +468,6 @@ async def start_service(service_name: str) -> str:
         # Start whisper-server
         cmd = [str(whisper_bin), "--host", "0.0.0.0", "--port", str(port), "--model", str(model_file)]
         
-    elif service_name == "kokoro":
-        # Find kokoro installation
-        kokoro_dir = find_kokoro_fastapi()
-        if not kokoro_dir:
-            return "❌ kokoro-fastapi not found. Please run kokoro_install first."
-        
-        # Use appropriate start script
-        if platform.system() == "Darwin":
-            start_script = Path(kokoro_dir) / "start-gpu_mac.sh"
-        else:
-            # On Linux, prefer GPU script if GPU is available, otherwise use CPU script
-            if has_gpu_support():
-                # Try GPU scripts first
-                possible_scripts = [
-                    Path(kokoro_dir) / "start-gpu.sh",
-                    Path(kokoro_dir) / "start-cpu.sh"  # last resort
-                ]
-            else:
-                # No GPU, prefer CPU script
-                possible_scripts = [
-                    Path(kokoro_dir) / "start-cpu.sh",
-                    Path(kokoro_dir) / "start-gpu.sh"  # might work with CPU fallback
-                ]
-            
-            start_script = None
-            for script in possible_scripts:
-                if script.exists():
-                    start_script = script
-                    break
-        
-        if not start_script.exists():
-            return f"❌ Start script not found: {start_script}"
-
-        cmd = [str(start_script)]
-
     elif service_name == "voicemode":
         # Start voicemode serve command directly
         # Use sys.executable to ensure we use the same Python that's running this script
@@ -572,15 +484,10 @@ async def start_service(service_name: str) -> str:
 
     try:
         # Start the process
-        cwd = None
-        if service_name == "kokoro":
-            cwd = Path(kokoro_dir)
-
         process = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            cwd=cwd
+            stderr=subprocess.PIPE
         )
 
         # Wait a moment to check if it started
@@ -615,8 +522,6 @@ async def stop_service(service_name: str) -> str:
         port = None
     elif service_name == "whisper":
         port = WHISPER_PORT
-    elif service_name == "kokoro":
-        port = KOKORO_PORT
     elif service_name == "voicemode":
         port = VOICEMODE_SERVE_PORT
     else:
@@ -719,11 +624,6 @@ async def enable_service(service_name: str) -> str:
             start_script = config_vars.get("START_SCRIPT", "")
             if not start_script or not Path(start_script).exists():
                 return "❌ Whisper start script not found. Please run whisper_install first."
-
-        elif service_name == "kokoro":
-            start_script = config_vars.get("START_SCRIPT", "")
-            if not start_script or not Path(start_script).exists():
-                return "❌ Kokoro start script not found. Please run kokoro_install first."
 
         elif service_name == "voicemode":
             start_script = config_vars.get("START_SCRIPT", "")
@@ -879,7 +779,7 @@ async def view_logs(service_name: str, lines: Optional[int] = None) -> str:
                 process_name = f"{service_name}-server"
             cmd = [
                 "log", "show",
-                "--predicate", f'process == "{process_name}" OR process == "kokoro-fastapi"',
+                "--predicate", f'process == "{process_name}"',
                 "--last", f"{lines}",
                 "--style", "compact"
             ]
@@ -939,16 +839,16 @@ async def view_logs(service_name: str, lines: Optional[int] = None) -> str:
 
 @mcp.tool()
 async def service(
-    service_name: Literal["whisper", "kokoro", "voicemode", "connect"],
+    service_name: Literal["whisper", "voicemode", "connect"],
     action: Literal["status", "start", "stop", "restart", "enable", "disable", "logs"] = "status",
     lines: Optional[Union[int, str]] = None
 ) -> str:
     """Unified service management tool for voice mode services.
 
-    Manage Whisper (STT), Kokoro (TTS), VoiceMode (HTTP MCP server), and Connect (standby) services.
+    Manage Whisper (STT), VoiceMode (HTTP MCP server), and Connect (standby) services.
 
     Args:
-        service_name: The service to manage ("whisper", "kokoro", "voicemode", or "connect")
+        service_name: The service to manage ("whisper", "voicemode", or "connect")
         action: The action to perform (default: "status")
             - status: Show if service is running and resource usage
             - start: Start the service
@@ -964,7 +864,6 @@ async def service(
 
     Examples:
         service("whisper", "status")  # Check if Whisper is running
-        service("kokoro", "start")    # Start Kokoro service
         service("voicemode", "start") # Start VoiceMode HTTP MCP server
         service("connect", "enable")  # Enable Connect standby service for remote wake
         service("whisper", "logs", 100)  # View last 100 lines of Whisper logs

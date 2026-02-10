@@ -53,32 +53,22 @@ async def simple_tts_failover(
 
         # Select appropriate voice for this provider
         if provider_type == "openai":
-            # Map Kokoro voices to OpenAI equivalents, or use OpenAI default
+            # Map voices to OpenAI equivalents if not already a standard OpenAI voice
             openai_voices = ["alloy", "echo", "fable", "nova", "onyx", "shimmer"]
             if voice in openai_voices:
                 selected_voice = voice
             else:
-                # Map common Kokoro voices to OpenAI equivalents
-                voice_mapping = {
-                    "af_sky": "nova",
-                    "af_sarah": "nova",
-                    "af_alloy": "alloy",
-                    "am_adam": "onyx",
-                    "am_echo": "echo",
-                    "am_onyx": "onyx",
-                    "bm_fable": "fable"
-                }
-                selected_voice = voice_mapping.get(voice, "alloy")  # Default to alloy
+                selected_voice = "alloy"  # Default to alloy for unknown voices
                 logger.info(f"Mapped voice {voice} to {selected_voice} for OpenAI")
         else:
-            selected_voice = voice  # Use original voice for Kokoro
+            selected_voice = voice  # Use original voice for local providers
 
         # Disable retries for local endpoints - they either work or don't
         max_retries = 0 if is_local_provider(base_url) else 2
         client = AsyncOpenAI(
             api_key=api_key,
             base_url=base_url,
-            timeout=120.0,  # Extended for slow TTS like Chatterbox
+            timeout=120.0,
             max_retries=max_retries
         )
 

@@ -25,13 +25,11 @@ If the MCP server isn't connected or the tool isn't available:
    ```bash
    uvx voice-mode-install --yes
    voicemode whisper service install
-   voicemode kokoro install
    ```
 
 3. **Check service status:**
    ```bash
    voicemode whisper service status
-   voicemode kokoro status
    ```
 
 4. **Reconnect MCP server after install:**

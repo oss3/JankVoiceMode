@@ -7,11 +7,6 @@ This directory contains all the FastMCP prompt definitions for the Voice Mode se
 ### conversation.py
 - `converse`: Start an interactive voice conversation - provides instructions for conducting natural voice conversations
 
-### kokoro_management.py
-- `kokoro-start`: Instructions to start the Kokoro TTS service
-- `kokoro-stop`: Instructions to stop the Kokoro TTS service  
-- `kokoro-status`: Instructions to check Kokoro TTS service status
-
 ### status.py
 - `voice-status`: Instructions to check comprehensive status of all voice services
 

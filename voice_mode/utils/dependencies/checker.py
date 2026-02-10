@@ -141,7 +141,7 @@ def check_component_dependencies(
     """Check all dependencies for a component.
 
     Args:
-        component: Component name ('core', 'whisper', 'kokoro', 'installation')
+        component: Component name ('core', 'whisper', 'installation')
         dependencies_yaml: Loaded dependencies (if None, loads from file)
 
     Returns:

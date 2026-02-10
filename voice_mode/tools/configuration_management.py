@@ -199,19 +199,11 @@ def write_env_file(file_path: Path, config: Dict[str, str], preserve_comments: b
         
         # Group new keys by category
         whisper_keys = sorted([k for k in new_keys if k.startswith('VOICEMODE_WHISPER_')])
-        kokoro_keys = sorted([k for k in new_keys if k.startswith('VOICEMODE_KOKORO_')])
-        other_keys = sorted([k for k in new_keys if not k.startswith('VOICEMODE_WHISPER_') and not k.startswith('VOICEMODE_KOKORO_')])
+        other_keys = sorted([k for k in new_keys if not k.startswith('VOICEMODE_WHISPER_')])
         
         if whisper_keys:
             existing_lines.append("# Whisper Configuration\n")
             for key in whisper_keys:
-                formatted_value = _format_env_value(config[key])
-                existing_lines.append(f"{key}={formatted_value}\n")
-            existing_lines.append('\n')
-
-        if kokoro_keys:
-            existing_lines.append("# Kokoro Configuration\n")
-            for key in kokoro_keys:
                 formatted_value = _format_env_value(config[key])
                 existing_lines.append(f"{key}={formatted_value}\n")
             existing_lines.append('\n')
@@ -311,19 +303,12 @@ async def list_config_keys() -> str:
             ("VOICEMODE_TTS_MODELS", "Comma-separated list of preferred models"),
             ("VOICEMODE_PREFER_LOCAL", "Prefer local providers over cloud (true/false)"),
             ("VOICEMODE_ALWAYS_TRY_LOCAL", "Always attempt local providers (true/false)"),
-            ("VOICEMODE_AUTO_START_KOKORO", "Auto-start Kokoro service (true/false)"),
         ]),
         ("Whisper Configuration", [
             ("VOICEMODE_WHISPER_MODEL", "Whisper model to use (e.g., large-v2)"),
             ("VOICEMODE_WHISPER_PORT", "Whisper server port (default: 2022)"),
             ("VOICEMODE_WHISPER_LANGUAGE", "Language for transcription (default: auto)"),
             ("VOICEMODE_WHISPER_MODEL_PATH", "Path to Whisper models"),
-        ]),
-        ("Kokoro Configuration", [
-            ("VOICEMODE_KOKORO_PORT", "Kokoro server port (default: 8880)"),
-            ("VOICEMODE_KOKORO_MODELS_DIR", "Directory for Kokoro models"),
-            ("VOICEMODE_KOKORO_CACHE_DIR", "Directory for Kokoro cache"),
-            ("VOICEMODE_KOKORO_DEFAULT_VOICE", "Default Kokoro voice (e.g., af_sky)"),
         ]),
         ("API Keys", [
             ("OPENAI_API_KEY", "OpenAI API key for cloud TTS/STT"),

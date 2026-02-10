@@ -449,30 +449,11 @@ def main(dry_run, voice_mode_version, skip_services, non_interactive, model):
                         print_error("VoiceMode command not found. Cannot install Whisper.")
                         logger.log_install('whisper', ['whisper'], False)
 
-                    # Install Kokoro
-                    click.echo()
-                    print_step("Installing Kokoro TTS service...")
-                    kokoro_cmd = ['voicemode', 'service', 'install', 'kokoro']
-                    try:
-                        result = subprocess.run(kokoro_cmd, check=True)
-                        if result.returncode == 0:
-                            print_success("Kokoro TTS service installed")
-                            logger.log_install('kokoro', ['kokoro'], True)
-                        else:
-                            print_warning("Kokoro installation may not have completed successfully")
-                            logger.log_install('kokoro', ['kokoro'], False)
-                    except subprocess.CalledProcessError as e:
-                        print_error(f"Kokoro installation failed: {e}")
-                        logger.log_install('kokoro', ['kokoro'], False)
-                    except FileNotFoundError:
-                        print_error("VoiceMode command not found. Cannot install Kokoro.")
-                        logger.log_install('kokoro', ['kokoro'], False)
             else:
                 click.echo("Cloud services recommended for your system configuration.")
                 click.echo("Local services can still be installed if desired:")
                 model_flag = f" --model {model}" if model != 'base' else ''
                 click.echo(f"  voicemode whisper install{model_flag}")
-                click.echo("  voicemode kokoro install")
 
         # Completion summary
         click.echo()

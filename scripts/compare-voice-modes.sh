@@ -5,7 +5,7 @@
 #
 # This script creates two tmux panes above the current pane with different voice configurations:
 # - Left pane: OpenAI (cloud-based TTS/STT)
-# - Right pane: Local (Whisper + Kokoro)
+# - Right pane: Local (Whisper + Local TTS)
 #
 # Usage: ./compare-voice-modes.sh [message]
 #        message: Optional message to speak (default: provider-specific greeting)
@@ -40,7 +40,7 @@ fi
 
 echo "Configuration:"
 echo "  Top-left pane:     OpenAI (Cloud)"
-echo "  Top-right pane:    Local (Whisper + Kokoro)"
+echo "  Top-right pane:    Local (Whisper + Local TTS)"
 echo "  Bottom pane:       Control/output (current)"
 echo ""
 
@@ -70,7 +70,7 @@ sleep 0.3
 
 # Add visual separators to each pane
 tmux send-keys -t "$LEFT_PANE" "clear && echo '╔════════════════════════════════════╗' && echo '║      OpenAI Voice Mode (Cloud)      ║' && echo '╚════════════════════════════════════╝' && echo ''" Enter
-tmux send-keys -t "$RIGHT_PANE" "clear && echo '╔════════════════════════════════════╗' && echo '║    Local Voice Mode (Whisper+Kokoro)║' && echo '╚════════════════════════════════════╝' && echo ''" Enter
+tmux send-keys -t "$RIGHT_PANE" "clear && echo '╔════════════════════════════════════╗' && echo '║    Local Voice Mode (Whisper+TTS)   ║' && echo '╚════════════════════════════════════╝' && echo ''" Enter
 
 sleep 0.3
 
@@ -88,7 +88,7 @@ fi
 OPENAI_CMD="VOICEMODE_TTS_BASE_URLS=https://api.openai.com/v1 VOICEMODE_STT_BASE_URLS=https://api.openai.com/v1 voicemode converse --transport local --message '$OPENAI_MESSAGE'"
 
 # Configuration for Local (right pane)
-# Uses local endpoints (defaults to Kokoro TTS + Whisper STT)
+# Uses local endpoints (defaults to local TTS + Whisper STT)
 LOCAL_CMD="VOICEMODE_VOICES=af_sky voicemode converse --transport local --message '$LOCAL_MESSAGE'"
 
 echo "⏳ Preparing both voice modes for simultaneous start..."

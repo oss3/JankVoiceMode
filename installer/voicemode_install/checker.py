@@ -44,10 +44,6 @@ class DependencyChecker:
         """Check Whisper STT dependencies."""
         return self._check_component_dependencies('whisper')
 
-    def check_kokoro_dependencies(self) -> List[PackageInfo]:
-        """Check Kokoro TTS dependencies."""
-        return self._check_component_dependencies('kokoro')
-
     def _check_component_dependencies(self, component: str) -> List[PackageInfo]:
         """Check dependencies for a specific component."""
         packages = []

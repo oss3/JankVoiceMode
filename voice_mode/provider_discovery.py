@@ -30,19 +30,15 @@ def detect_provider_type(base_url: str) -> str:
         return "unknown"
     if "openai.com" in base_url:
         return "openai"
-    elif ":8880" in base_url:
-        return "kokoro"
     elif ":2022" in base_url:
         return "whisper"
     elif "127.0.0.1" in base_url or "localhost" in base_url:
         # Try to infer from port if not already detected
         if base_url.endswith("/v1"):
             port_part = base_url[:-3].split(":")[-1]
-            if port_part == "8880":
-                return "kokoro"
-            elif port_part == "2022":
+            if port_part == "2022":
                 return "whisper"
-        return "local"  # Generic local provider
+        return "local"  # Generic local provider (e.g., Fish Speech)
     else:
         return "unknown"
 
@@ -52,7 +48,7 @@ def is_local_provider(base_url: str) -> bool:
     if not base_url:
         return False
     provider_type = detect_provider_type(base_url)
-    return provider_type in ["kokoro", "whisper", "local"] or \
+    return provider_type in ["whisper", "local"] or \
            "127.0.0.1" in base_url or \
            "localhost" in base_url
 
@@ -63,7 +59,7 @@ class EndpointInfo:
     base_url: str
     models: List[str]
     voices: List[str]  # Only for TTS
-    provider_type: Optional[str] = None  # e.g., "openai", "kokoro", "whisper"
+    provider_type: Optional[str] = None  # e.g., "openai", "whisper", "local"
     last_check: Optional[str] = None  # ISO format timestamp of last attempt
     last_error: Optional[str] = None  # Last error if any
 

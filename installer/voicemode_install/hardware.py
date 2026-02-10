@@ -53,7 +53,7 @@ class HardwareInfo:
         if self.is_apple_silicon():
             return (
                 f"Your Apple Silicon Mac with {self.total_ram_gb:.1f}GB RAM is great for local services.\n"
-                f"Whisper and Kokoro will run fast and privately on your hardware."
+                f"Whisper and local TTS will run fast and privately on your hardware."
             )
         elif self.is_arm64():
             if self.total_ram_gb >= 8:
@@ -87,6 +87,5 @@ class HardwareInfo:
         """Estimate download size for local services."""
         # Rough estimates:
         # Whisper: ~150MB (base model) to ~3GB (large model)
-        # Kokoro: ~500MB
-        # Total: ~2-4GB for full setup
-        return "~2-4GB total (Whisper models + Kokoro)"
+        # Total: ~1-3GB for full setup
+        return "~1-3GB total (Whisper models)"

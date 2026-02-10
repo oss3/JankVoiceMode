@@ -16,7 +16,7 @@ class ExchangeMetadata:
     voice: Optional[str] = None
     provider: Optional[str] = None
     provider_url: Optional[str] = None  # Full URL of the provider endpoint
-    provider_type: Optional[str] = None  # e.g., "openai", "local", "kokoro"
+    provider_type: Optional[str] = None  # e.g., "openai", "local"
     timing: Optional[str] = None
     transport: Optional[str] = None
     audio_format: Optional[str] = None

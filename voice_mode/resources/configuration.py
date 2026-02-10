@@ -9,13 +9,11 @@ from ..config import (
     logger,
     # Core settings
     BASE_DIR, DEBUG, SAVE_ALL, SAVE_AUDIO, SAVE_TRANSCRIPTIONS,
-    AUDIO_FEEDBACK_ENABLED, PREFER_LOCAL, ALWAYS_TRY_LOCAL, AUTO_START_KOKORO,
+    AUDIO_FEEDBACK_ENABLED, PREFER_LOCAL, ALWAYS_TRY_LOCAL,
     # Service settings
     OPENAI_API_KEY, TTS_BASE_URLS, STT_BASE_URLS, TTS_VOICES, TTS_MODELS,
     # Whisper settings
     WHISPER_MODEL, WHISPER_PORT, WHISPER_LANGUAGE, WHISPER_MODEL_PATH,
-    # Kokoro settings
-    KOKORO_PORT, KOKORO_MODELS_DIR, KOKORO_CACHE_DIR, KOKORO_DEFAULT_VOICE,
     # Audio settings
     AUDIO_FORMAT, TTS_AUDIO_FORMAT, STT_AUDIO_FORMAT,
     SAMPLE_RATE, CHANNELS,
@@ -46,7 +44,7 @@ async def all_configuration() -> str:
     - Core settings (directories, saving options)
     - Provider settings (TTS/STT endpoints and preferences)
     - Audio settings (formats, quality)
-    - Service-specific settings (Whisper, Kokoro)
+    - Service-specific settings (Whisper)
     - Silence detection parameters
     - Streaming configuration
     - Event logging settings
@@ -72,7 +70,6 @@ async def all_configuration() -> str:
     lines.append("Provider Settings:")
     lines.append(f"  Prefer Local: {PREFER_LOCAL}")
     lines.append(f"  Always Try Local: {ALWAYS_TRY_LOCAL}")
-    lines.append(f"  Auto-start Kokoro: {AUTO_START_KOKORO}")
     lines.append(f"  TTS Endpoints: {', '.join(TTS_BASE_URLS)}")
     lines.append(f"  STT Endpoints: {', '.join(STT_BASE_URLS)}")
     lines.append(f"  TTS Voices: {', '.join(TTS_VOICES)}")
@@ -124,14 +121,6 @@ async def all_configuration() -> str:
     lines.append(f"  Endpoint: http://127.0.0.1:{WHISPER_PORT}/v1")
     lines.append("")
     
-    # Kokoro
-    lines.append("Kokoro Configuration:")
-    lines.append(f"  Port: {KOKORO_PORT}")
-    lines.append(f"  Models Directory: {KOKORO_MODELS_DIR}")
-    lines.append(f"  Cache Directory: {KOKORO_CACHE_DIR}")
-    lines.append(f"  Default Voice: {KOKORO_DEFAULT_VOICE}")
-    lines.append(f"  Endpoint: http://127.0.0.1:{KOKORO_PORT}/v1")
-    
     return "\n".join(lines)
 
 
@@ -166,41 +155,6 @@ async def whisper_configuration() -> str:
     lines.append(f"  VOICEMODE_WHISPER_PORT: {os.getenv('VOICEMODE_WHISPER_PORT', '[not set]')}")
     lines.append(f"  VOICEMODE_WHISPER_LANGUAGE: {os.getenv('VOICEMODE_WHISPER_LANGUAGE', '[not set]')}")
     lines.append(f"  VOICEMODE_WHISPER_MODEL_PATH: {os.getenv('VOICEMODE_WHISPER_MODEL_PATH', '[not set]')}")
-    
-    return "\n".join(lines)
-
-
-@mcp.resource("voice://config/kokoro")
-async def kokoro_configuration() -> str:
-    """
-    Kokoro TTS service configuration.
-    
-    Shows all Kokoro-specific settings including:
-    - Port configuration
-    - Models directory
-    - Cache directory
-    - Default voice selection
-    
-    These settings control how the local Kokoro TTS service operates.
-    """
-    lines = []
-    lines.append("Kokoro Service Configuration")
-    lines.append("=" * 40)
-    lines.append("")
-    
-    lines.append("Current Settings:")
-    lines.append(f"  Port: {KOKORO_PORT}")
-    lines.append(f"  Models Directory: {KOKORO_MODELS_DIR}")
-    lines.append(f"  Cache Directory: {KOKORO_CACHE_DIR}")
-    lines.append(f"  Default Voice: {KOKORO_DEFAULT_VOICE}")
-    lines.append(f"  Endpoint: http://127.0.0.1:{KOKORO_PORT}/v1")
-    lines.append("")
-    
-    lines.append("Environment Variables:")
-    lines.append(f"  VOICEMODE_KOKORO_PORT: {os.getenv('VOICEMODE_KOKORO_PORT', '[not set]')}")
-    lines.append(f"  VOICEMODE_KOKORO_MODELS_DIR: {os.getenv('VOICEMODE_KOKORO_MODELS_DIR', '[not set]')}")
-    lines.append(f"  VOICEMODE_KOKORO_CACHE_DIR: {os.getenv('VOICEMODE_KOKORO_CACHE_DIR', '[not set]')}")
-    lines.append(f"  VOICEMODE_KOKORO_DEFAULT_VOICE: {os.getenv('VOICEMODE_KOKORO_DEFAULT_VOICE', '[not set]')}")
     
     return "\n".join(lines)
 
@@ -264,7 +218,6 @@ async def environment_variables() -> str:
         # Provider Settings
         ("VOICEMODE_PREFER_LOCAL", "Prefer local providers over cloud (true/false)"),
         ("VOICEMODE_ALWAYS_TRY_LOCAL", "Always attempt local providers (true/false)"),
-        ("VOICEMODE_AUTO_START_KOKORO", "Auto-start Kokoro service (true/false)"),
         ("VOICEMODE_TTS_BASE_URLS", "Comma-separated list of TTS endpoints"),
         ("VOICEMODE_STT_BASE_URLS", "Comma-separated list of STT endpoints"),
         ("VOICEMODE_VOICES", "Comma-separated list of preferred voices"),
@@ -278,11 +231,6 @@ async def environment_variables() -> str:
         ("VOICEMODE_WHISPER_PORT", "Whisper server port"),
         ("VOICEMODE_WHISPER_LANGUAGE", "Language for transcription"),
         ("VOICEMODE_WHISPER_MODEL_PATH", "Path to Whisper models"),
-        # Kokoro Configuration
-        ("VOICEMODE_KOKORO_PORT", "Kokoro server port"),
-        ("VOICEMODE_KOKORO_MODELS_DIR", "Directory for Kokoro models"),
-        ("VOICEMODE_KOKORO_CACHE_DIR", "Directory for Kokoro cache"),
-        ("VOICEMODE_KOKORO_DEFAULT_VOICE", "Default Kokoro voice"),
         # Silence Detection
         ("VOICEMODE_DISABLE_SILENCE_DETECTION", "Disable silence detection (true/false)"),
         ("VOICEMODE_VAD_AGGRESSIVENESS", "Voice activity detection aggressiveness (0-3)"),
@@ -355,7 +303,6 @@ async def environment_template() -> str:
         "# Provider Settings",
         f"export VOICEMODE_PREFER_LOCAL=\"{str(PREFER_LOCAL).lower()}\"",
         f"export VOICEMODE_ALWAYS_TRY_LOCAL=\"{str(ALWAYS_TRY_LOCAL).lower()}\"",
-        f"export VOICEMODE_AUTO_START_KOKORO=\"{str(AUTO_START_KOKORO).lower()}\"",
         f"export VOICEMODE_TTS_BASE_URLS=\"{','.join(TTS_BASE_URLS)}\"",
         f"export VOICEMODE_STT_BASE_URLS=\"{','.join(STT_BASE_URLS)}\"",
         f"export VOICEMODE_VOICES=\"{','.join(TTS_VOICES)}\"",
@@ -371,12 +318,6 @@ async def environment_template() -> str:
         f"export VOICEMODE_WHISPER_PORT=\"{WHISPER_PORT}\"",
         f"export VOICEMODE_WHISPER_LANGUAGE=\"{WHISPER_LANGUAGE}\"",
         f"export VOICEMODE_WHISPER_MODEL_PATH=\"{WHISPER_MODEL_PATH}\"",
-        "",
-        "# Kokoro Configuration",
-        f"export VOICEMODE_KOKORO_PORT=\"{KOKORO_PORT}\"",
-        f"export VOICEMODE_KOKORO_MODELS_DIR=\"{KOKORO_MODELS_DIR}\"",
-        f"export VOICEMODE_KOKORO_CACHE_DIR=\"{KOKORO_CACHE_DIR}\"",
-        f"export VOICEMODE_KOKORO_DEFAULT_VOICE=\"{KOKORO_DEFAULT_VOICE}\"",
         "",
         "# Silence Detection",
         f"export VOICEMODE_DISABLE_SILENCE_DETECTION=\"{str(DISABLE_SILENCE_DETECTION).lower()}\"",

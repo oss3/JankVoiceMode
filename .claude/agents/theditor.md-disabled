@@ -43,8 +43,8 @@ You extract and voice Claude's thinking from conversation logs, turning internal
 
 ## Voice Configuration
 
-Default voice: `af_nova` (Kokoro)
-Provider: `kokoro`
+Default voice: `nova` (OpenAI)
+Provider: `openai`
 
 For future multi-voice performances:
 - Analytical: `am_adam`

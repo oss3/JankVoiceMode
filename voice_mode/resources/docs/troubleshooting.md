@@ -102,7 +102,7 @@
 
 2. Environment variables are set correctly:
    - `OPENAI_API_KEY` (if using OpenAI)
-   - Service URLs for Whisper/Kokoro
+   - Service URLs for Whisper and TTS endpoints
 
 3. Network connectivity to services
 
@@ -145,10 +145,7 @@
 **Problem:** Words mispronounced, especially for non-English.
 
 **Solutions:**
-1. For non-English, use Kokoro with appropriate voice:
-   ```python
-   converse("Bonjour", voice="ff_siwis", tts_provider="kokoro")
-   ```
+1. Use appropriate voice for the language from your TTS provider
 
 2. See `voicemode-languages` resource for language-specific voices
 
@@ -160,7 +157,6 @@
 1. Try different voice:
    ```python
    converse("Hello", voice="nova")  # OpenAI
-   converse("Hello", voice="af_sky", tts_provider="kokoro")
    ```
 
 2. Use HD model for better quality:
@@ -246,8 +242,8 @@ converse("Quick update", speed=1.5)
 ✅ **Do:** Use supported voices (nova, shimmer, af_sky, etc.)
 
 ### Not specifying voice for non-English
-❌ **Don't:** `converse("Bonjour")`
-✅ **Do:** `converse("Bonjour", voice="ff_siwis", tts_provider="kokoro")`
+❌ **Don't:** `converse("Bonjour")` without considering language-appropriate voice
+✅ **Do:** Use a voice appropriate for the target language
 
 ### Setting listen_duration_max too low
 ❌ **Don't:** `listen_duration_max=5` for complex questions

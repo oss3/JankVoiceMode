@@ -17,7 +17,6 @@ from datetime import datetime
 
 from voice_mode.config import BASE_DIR
 from voice_mode.utils.services.whisper_helpers import find_whisper_server
-from voice_mode.utils.services.kokoro_helpers import find_kokoro_fastapi
 from voice_mode.utils.services.common import find_process_by_port
 from voice_mode.utils.version_helpers import get_current_version
 
@@ -106,84 +105,15 @@ def get_whisper_version() -> Dict[str, Any]:
     return info
 
 
-def get_kokoro_version() -> Dict[str, Any]:
-    """Get Kokoro installation and version information."""
-    info = {
-        "installed": False,
-        "version": None,
-        "installation_path": None,
-        "api_version": None,
-        "models_info": {},
-        "running": False,
-        "error": None
-    }
-    
-    try:
-        # Check if kokoro is installed
-        kokoro_dir = find_kokoro_fastapi()
-        if kokoro_dir:
-            info["installed"] = True
-            info["installation_path"] = kokoro_dir
-            
-            # Try to get version from git
-            try:
-                version = get_current_version(Path(kokoro_dir))
-                if version:
-                    info["version"] = version
-            except:
-                pass
-            
-            # Check if running and get API version
-            proc = find_process_by_port(8880)
-            if proc:
-                info["running"] = True
-                info["pid"] = proc.pid
-                try:
-                    info["uptime_seconds"] = int(proc.create_time())
-                except:
-                    pass
-                
-                # Try to get version from API
-                try:
-                    import httpx
-                    response = httpx.get("http://localhost:8880/", timeout=2.0)
-                    if response.status_code == 200:
-                        data = response.json()
-                        if isinstance(data, dict):
-                            info["api_version"] = data.get("version", "unknown")
-                            # Extract other useful info
-                            if "models" in data:
-                                info["models_info"]["available_models"] = data["models"]
-                except Exception as e:
-                    logger.debug(f"Could not get Kokoro API info: {e}")
-            
-            # Check for models
-            models_dir = Path(kokoro_dir) / "models"
-            if not models_dir.exists():
-                # Check alternative location
-                models_dir = BASE_DIR / "kokoro-models"
-            
-            if models_dir.exists():
-                model_files = list(models_dir.glob("*.onnx")) + list(models_dir.glob("*.bin"))
-                info["models_info"]["count"] = len(model_files)
-                info["models_info"]["total_size_mb"] = sum(f.stat().st_size for f in model_files) / (1024 * 1024)
-                
-    except Exception as e:
-        info["error"] = str(e)
-        logger.error(f"Error getting kokoro version info: {e}")
-    
-    return info
-
-
 async def service_version(
     service_name: Optional[str] = None
 ) -> Dict[str, Any]:
     """Get version information for voice services.
 
-    Shows detailed version, installation, and runtime information for Whisper and/or Kokoro.
+    Shows detailed version, installation, and runtime information for Whisper.
 
     Args:
-        service_name: Specific service to check ("whisper" or "kokoro"). If not specified, checks both.
+        service_name: Specific service to check ("whisper"). If not specified, checks all.
 
     Returns:
         Dictionary with version information for requested service(s)
@@ -192,9 +122,6 @@ async def service_version(
 
     if service_name is None or service_name == "whisper":
         result["whisper"] = get_whisper_version()
-
-    if service_name is None or service_name == "kokoro":
-        result["kokoro"] = get_kokoro_version()
 
     # Add voice-mode version info
     result["voice_mode"] = {
@@ -224,10 +151,10 @@ async def check_updates(
 ) -> Dict[str, Any]:
     """Check for available updates for voice services.
 
-    Checks if newer versions are available for Whisper and/or Kokoro.
+    Checks if newer versions are available for Whisper.
 
     Args:
-        service_name: Specific service to check ("whisper" or "kokoro"). If not specified, checks both.
+        service_name: Specific service to check ("whisper"). If not specified, checks all.
 
     Returns:
         Dictionary with update availability information
@@ -269,41 +196,5 @@ async def check_updates(
             whisper_info["error"] = str(e)
         
         result["whisper"] = whisper_info
-    
-    if service_name is None or service_name == "kokoro":
-        kokoro_info = {
-            "current_version": None,
-            "latest_version": None,
-            "update_available": False,
-            "error": None
-        }
-        
-        try:
-            # Get current version
-            version_info = get_kokoro_version()
-            if version_info["installed"] and version_info["version"]:
-                kokoro_info["current_version"] = version_info["version"]
-            
-            # Check latest from GitHub
-            import httpx
-            response = httpx.get(
-                "https://api.github.com/repos/remsky/Kokoro-FastAPI/commits/main",
-                headers={"Accept": "application/vnd.github.v3+json"},
-                timeout=5.0
-            )
-            if response.status_code == 200:
-                data = response.json()
-                latest_commit = data.get("sha", "")[:7]
-                latest_message = data.get("commit", {}).get("message", "").split('\n')[0]
-                kokoro_info["latest_version"] = f"{latest_commit} {latest_message}"
-                
-                # Simple check if update available
-                if kokoro_info["current_version"] and latest_commit not in kokoro_info["current_version"]:
-                    kokoro_info["update_available"] = True
-                    
-        except Exception as e:
-            kokoro_info["error"] = str(e)
-        
-        result["kokoro"] = kokoro_info
 
     return result

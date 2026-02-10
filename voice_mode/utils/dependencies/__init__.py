@@ -1,7 +1,7 @@
 """Dependency management for VoiceMode.
 
 This module provides utilities for checking and installing system dependencies
-required by VoiceMode and its service components (Whisper, Kokoro, etc.).
+required by VoiceMode and its service components (Whisper, etc.).
 """
 
 from .checker import (

@@ -69,7 +69,7 @@ For manual setup, see the [Getting Started Guide](docs/tutorials/getting-started
 ## Features
 
 - **Natural conversations** - speak naturally, hear responses immediately
-- **Works offline** - optional local voice services (Whisper STT, Kokoro TTS)
+- **Works offline** - optional local voice services (Whisper STT, Fish Speech TTS)
 - **Low latency** - fast enough to feel like a real conversation
 - **Smart silence detection** - stops recording when you stop speaking
 - **Privacy options** - run entirely locally or use cloud services
@@ -170,7 +170,7 @@ VOICEMODE_AGENT_CLAUDE_ARGS=   # Extra args for Claude Code
 For privacy or offline use, install local speech services:
 
 - **[Whisper.cpp](docs/guides/whisper-setup.md)** - Local speech-to-text
-- **[Kokoro](docs/guides/kokoro-setup.md)** - Local text-to-speech with multiple voices
+- **Fish Speech** (or other OpenAI-compatible TTS) - Local text-to-speech via OpenAI-compatible endpoints
 
 These provide the same API as OpenAI, so VoiceMode switches seamlessly between them.
 
@@ -257,7 +257,7 @@ export VOICEMODE_SAVE_AUDIO=true
 - [Getting Started](docs/tutorials/getting-started.md) - Full setup guide
 - [Configuration](docs/guides/configuration.md) - All environment variables
 - [Whisper Setup](docs/guides/whisper-setup.md) - Local speech-to-text
-- [Kokoro Setup](docs/guides/kokoro-setup.md) - Local text-to-speech
+- [Configuration](docs/guides/configuration.md) - TTS/STT endpoint configuration
 - [Development Setup](docs/tutorials/development-setup.md) - Contributing guide
 
 Full documentation: [voice-mode.readthedocs.io](https://voice-mode.readthedocs.io)

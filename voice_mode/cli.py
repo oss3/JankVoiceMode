@@ -97,7 +97,7 @@ def voice_mode() -> None:
 #   voicemode service status [service]
 # etc.
 
-VALID_SERVICES = ['whisper', 'kokoro', 'voicemode', 'connect']
+VALID_SERVICES = ['whisper', 'voicemode', 'connect']
 
 
 @voice_mode_main_cli.group()
@@ -108,7 +108,6 @@ def service():
     \b
     Services:
       whisper    Local speech-to-text (STT) on port 2022
-      kokoro     Local text-to-speech (TTS) on port 8880
       voicemode  HTTP MCP server for remote access on port 8765
       connect    Remote wake standby (WebSocket client)
 
@@ -120,7 +119,7 @@ def service():
 
     \b
     Service Lifecycle:
-      install  Install service software (whisper, kokoro)
+      install  Install service software (whisper)
       start    Start a service
       stop     Stop a service
       restart  Restart a service
@@ -142,7 +141,6 @@ def service_start(service_name):
     \b
     Services:
       whisper    Local speech-to-text (STT)
-      kokoro     Local text-to-speech (TTS)
       voicemode  HTTP MCP server for remote access
     """
     from voice_mode.tools.service import start_service
@@ -159,7 +157,6 @@ def service_stop(service_name):
     \b
     Services:
       whisper    Local speech-to-text (STT)
-      kokoro     Local text-to-speech (TTS)
       voicemode  HTTP MCP server for remote access
     """
     from voice_mode.tools.service import stop_service
@@ -176,7 +173,6 @@ def service_restart(service_name):
     \b
     Services:
       whisper    Local speech-to-text (STT)
-      kokoro     Local text-to-speech (TTS)
       voicemode  HTTP MCP server for remote access
     """
     from voice_mode.tools.service import restart_service
@@ -197,7 +193,6 @@ def service_status(service_name):
     \b
     Services:
       whisper    Local speech-to-text (STT)
-      kokoro     Local text-to-speech (TTS)
       voicemode  HTTP MCP server for remote access
 
     \b
@@ -235,7 +230,6 @@ def service_enable(service_name):
     \b
     Services:
       whisper    Local speech-to-text (STT)
-      kokoro     Local text-to-speech (TTS)
       voicemode  HTTP MCP server for remote access
     """
     from voice_mode.tools.service import enable_service
@@ -256,7 +250,6 @@ def service_disable(service_name):
     \b
     Services:
       whisper    Local speech-to-text (STT)
-      kokoro     Local text-to-speech (TTS)
       voicemode  HTTP MCP server for remote access
     """
     from voice_mode.tools.service import disable_service
@@ -294,15 +287,14 @@ def service_health(service_name):
     \b
     Checks if the service is responding on its expected port:
       whisper    Port 2022
-      kokoro     Port 8880
       voicemode  Port 8765 (configurable via VOICEMODE_SERVE_PORT)
     """
     if service_name == 'whisper':
         port = 2022
         display_name = 'Whisper'
-    elif service_name == 'kokoro':
-        port = 8880
-        display_name = 'Kokoro'
+    elif service_name == 'voicemode':
+        port = int(os.environ.get('VOICEMODE_SERVE_PORT', '8765'))
+        display_name = 'VoiceMode'
     else:
         click.echo(f"❌ Unknown service: {service_name}")
         return
@@ -341,13 +333,12 @@ def service_install(service_name, force):
     \b
     Downloads and installs the service software:
       whisper    whisper.cpp speech-to-text server
-      kokoro     Kokoro text-to-speech server
       voicemode  Already installed (enables the HTTP server)
 
     \b
     Examples:
       voicemode service install whisper
-      voicemode service install kokoro --force
+      voicemode service install whisper --force
     """
     if service_name == 'whisper':
         from voice_mode.tools.whisper.install import whisper_install
@@ -360,18 +351,6 @@ def service_install(service_name, force):
                     click.echo(f"   Install path: {result['install_path']}")
             else:
                 click.echo(f"❌ Whisper installation failed: {result.get('error', 'Unknown error')}")
-        else:
-            click.echo(result)
-    elif service_name == 'kokoro':
-        from voice_mode.tools.kokoro.install import kokoro_install
-        result = asyncio.run(kokoro_install.fn(force_reinstall=force))
-        if isinstance(result, dict):
-            if result.get("success"):
-                click.echo(f"✅ Kokoro installed successfully")
-                if result.get('install_path'):
-                    click.echo(f"   Install path: {result['install_path']}")
-            else:
-                click.echo(f"❌ Kokoro installation failed: {result.get('error', 'Unknown error')}")
         else:
             click.echo(result)
     elif service_name == 'voicemode':
@@ -395,189 +374,12 @@ def service_install(service_name, force):
 
 @voice_mode_main_cli.group(hidden=True)
 @click.help_option('-h', '--help', help='Show this message and exit')
-def kokoro():
-    """Manage Kokoro TTS service. [DEPRECATED: Use 'voicemode service' instead]"""
-    pass
-
-
-@voice_mode_main_cli.group(hidden=True)
-@click.help_option('-h', '--help', help='Show this message and exit')
 def whisper():
     """Manage Whisper STT service. [DEPRECATED: Use 'voicemode service' instead]"""
     pass
 
 
 # Service functions are imported lazily in their respective command handlers to improve startup time
-
-
-# Kokoro service commands (deprecated - hidden from help but still functional)
-@kokoro.command(hidden=True)
-def status():
-    """(Deprecated) Show Kokoro service status. Use 'voicemode service status kokoro' instead."""
-    click.secho("⚠️  Deprecated: Use 'voicemode service status kokoro' instead", fg='yellow', err=True)
-    from voice_mode.tools.service import status_service
-    result = asyncio.run(status_service("kokoro"))
-    click.echo(result)
-
-
-@kokoro.command(hidden=True)
-def start():
-    """(Deprecated) Start Kokoro service. Use 'voicemode service start kokoro' instead."""
-    click.secho("⚠️  Deprecated: Use 'voicemode service start kokoro' instead", fg='yellow', err=True)
-    from voice_mode.tools.service import start_service
-    result = asyncio.run(start_service("kokoro"))
-    click.echo(result)
-
-
-@kokoro.command(hidden=True)
-def stop():
-    """(Deprecated) Stop Kokoro service. Use 'voicemode service stop kokoro' instead."""
-    click.secho("⚠️  Deprecated: Use 'voicemode service stop kokoro' instead", fg='yellow', err=True)
-    from voice_mode.tools.service import stop_service
-    result = asyncio.run(stop_service("kokoro"))
-    click.echo(result)
-
-
-@kokoro.command(hidden=True)
-def restart():
-    """(Deprecated) Restart Kokoro service. Use 'voicemode service restart kokoro' instead."""
-    click.secho("⚠️  Deprecated: Use 'voicemode service restart kokoro' instead", fg='yellow', err=True)
-    from voice_mode.tools.service import restart_service
-    result = asyncio.run(restart_service("kokoro"))
-    click.echo(result)
-
-
-@kokoro.command(hidden=True)
-def enable():
-    """(Deprecated) Enable Kokoro service. Use 'voicemode service enable kokoro' instead."""
-    click.secho("⚠️  Deprecated: Use 'voicemode service enable kokoro' instead", fg='yellow', err=True)
-    from voice_mode.tools.service import enable_service
-    result = asyncio.run(enable_service("kokoro"))
-    click.echo(result)
-
-
-@kokoro.command(hidden=True)
-def disable():
-    """(Deprecated) Disable Kokoro service. Use 'voicemode service disable kokoro' instead."""
-    click.secho("⚠️  Deprecated: Use 'voicemode service disable kokoro' instead", fg='yellow', err=True)
-    from voice_mode.tools.service import disable_service
-    result = asyncio.run(disable_service("kokoro"))
-    click.echo(result)
-
-
-@kokoro.command(hidden=True)
-@click.help_option('-h', '--help')
-@click.option('--lines', '-n', default=50, help='Number of log lines to show')
-def logs(lines):
-    """(Deprecated) View Kokoro logs. Use 'voicemode service logs kokoro' instead."""
-    click.secho("⚠️  Deprecated: Use 'voicemode service logs kokoro' instead", fg='yellow', err=True)
-    from voice_mode.tools.service import view_logs
-    result = asyncio.run(view_logs("kokoro", lines))
-    click.echo(result)
-
-
-@kokoro.command(hidden=True)
-def health():
-    """Check Kokoro health endpoint."""
-    import subprocess
-    try:
-        result = subprocess.run(
-            ["curl", "-s", "http://127.0.0.1:8880/health"],
-            capture_output=True, text=True, timeout=5
-        )
-        if result.returncode == 0:
-            import json
-            try:
-                health_data = json.loads(result.stdout)
-                click.echo("✅ Kokoro is responding")
-                click.echo(f"   Status: {health_data.get('status', 'unknown')}")
-                if 'uptime' in health_data:
-                    click.echo(f"   Uptime: {health_data['uptime']}")
-            except json.JSONDecodeError:
-                click.echo("✅ Kokoro is responding (non-JSON response)")
-        else:
-            click.echo("❌ Kokoro not responding on port 8880")
-    except subprocess.TimeoutExpired:
-        click.echo("❌ Kokoro health check timed out")
-    except Exception as e:
-        click.echo(f"❌ Health check failed: {e}")
-
-
-@kokoro.command()
-@click.help_option('-h', '--help')
-@click.option('--install-dir', help='Directory to install kokoro-fastapi')
-@click.option('--port', default=8880, help='Port to configure for the service')
-@click.option('--force', '-f', is_flag=True, help='Force reinstall even if already installed')
-@click.option('--version', default='latest', help='Version to install (default: latest)')
-@click.option('--auto-enable/--no-auto-enable', default=None, help='Enable service at boot/login')
-@click.option('--skip-deps', is_flag=True, help='Skip dependency checks (for advanced users)')
-def install(install_dir, port, force, version, auto_enable, skip_deps):
-    """Install kokoro-fastapi TTS service."""
-    from voice_mode.tools.kokoro.install import kokoro_install
-    result = asyncio.run(kokoro_install.fn(
-        install_dir=install_dir,
-        port=port,
-        force_reinstall=force,
-        version=version,
-        auto_enable=auto_enable,
-        skip_deps=skip_deps
-    ))
-    
-    if result.get('success'):
-        if result.get('already_installed'):
-            click.echo(f"✅ Kokoro already installed at {result['install_path']}")
-            click.echo(f"   Version: {result.get('version', 'unknown')}")
-        else:
-            click.echo("✅ Kokoro installed successfully!")
-            click.echo(f"   Install path: {result['install_path']}")
-            click.echo(f"   Version: {result.get('version', 'unknown')}")
-            
-        if result.get('enabled'):
-            click.echo("   Auto-start: Enabled")
-        
-        if result.get('migration_message'):
-            click.echo(f"\n{result['migration_message']}")
-    else:
-        click.echo(f"❌ Installation failed: {result.get('error', 'Unknown error')}")
-        if result.get('details'):
-            click.echo(f"   Details: {result['details']}")
-
-
-@kokoro.command()
-@click.help_option('-h', '--help')
-@click.option('--remove-models', is_flag=True, help='Also remove downloaded Kokoro models')
-@click.option('--remove-all-data', is_flag=True, help='Remove all Kokoro data including logs and cache')
-@click.confirmation_option(prompt='Are you sure you want to uninstall Kokoro?')
-def uninstall(remove_models, remove_all_data):
-    """Uninstall kokoro-fastapi service and optionally remove data."""
-    from voice_mode.tools.kokoro.uninstall import kokoro_uninstall
-    result = asyncio.run(kokoro_uninstall.fn(
-        remove_models=remove_models,
-        remove_all_data=remove_all_data
-    ))
-    
-    if result.get('success'):
-        click.echo("✅ Kokoro uninstalled successfully!")
-        
-        if result.get('service_stopped'):
-            click.echo("   Service stopped")
-        if result.get('service_disabled'):
-            click.echo("   Service disabled")
-        if result.get('install_removed'):
-            click.echo(f"   Installation removed: {result['install_path']}")
-        if result.get('models_removed'):
-            click.echo("   Models removed")
-        if result.get('data_removed'):
-            click.echo("   All data removed")
-            
-        if result.get('warnings'):
-            click.echo("\n⚠️  Warnings:")
-            for warning in result['warnings']:
-                click.echo(f"   - {warning}")
-    else:
-        click.echo(f"❌ Uninstall failed: {result.get('error', 'Unknown error')}")
-        if result.get('details'):
-            click.echo(f"   Details: {result['details']}")
 
 
 # Create service group for whisper
@@ -1469,7 +1271,7 @@ def config_edit(editor):
 # Dependency management group
 @voice_mode_main_cli.command()
 @click.help_option('-h', '--help')
-@click.option('--component', type=click.Choice(['core', 'whisper', 'kokoro']),
+@click.option('--component', type=click.Choice(['core', 'whisper']),
               help='Check specific component only')
 @click.option('--yes', '-y', is_flag=True, help='Install without prompting')
 @click.option('--dry-run', is_flag=True, help='Show what would be installed')
@@ -1493,7 +1295,7 @@ def deps(component, yes, dry_run, verbose):
     )
 
     deps_yaml = load_dependencies()
-    components = [component] if component else ['core', 'whisper', 'kokoro']
+    components = [component] if component else ['core', 'whisper']
 
     all_missing = []
 
@@ -1666,7 +1468,7 @@ voice_mode_main_cli.add_command(transcribe_audio_cmd)
 @click.option('--duration', '-d', type=float, default=DEFAULT_LISTEN_DURATION, help='Listen duration in seconds')
 @click.option('--min-duration', type=float, default=MIN_RECORDING_DURATION, help='Minimum listen duration before silence detection')
 @click.option('--voice', help='TTS voice to use (e.g., nova, shimmer, af_sky)')
-@click.option('--tts-provider', type=click.Choice(['openai', 'kokoro']), help='TTS provider')
+@click.option('--tts-provider', type=click.Choice(['openai']), help='TTS provider')
 @click.option('--tts-model', help='TTS model (e.g., tts-1, tts-1-hd)')
 @click.option('--tts-instructions', help='Tone/style instructions for gpt-4o-mini-tts')
 @click.option('--audio-feedback/--no-audio-feedback', default=None, help='Enable/disable audio feedback')

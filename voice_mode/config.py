@@ -159,9 +159,6 @@ def load_voicemode_env():
 # Always attempt local providers (true/false)
 # VOICEMODE_ALWAYS_TRY_LOCAL=true
 
-# Auto-start Kokoro service (true/false)
-# VOICEMODE_AUTO_START_KOKORO=false
-
 #############
 # Whisper Configuration
 #############
@@ -180,22 +177,6 @@ def load_voicemode_env():
 
 # Path to Whisper models
 # VOICEMODE_WHISPER_MODEL_PATH=~/.voicemode/services/whisper/models
-
-#############
-# Kokoro Configuration
-#############
-
-# Kokoro server port (default: 8880)
-# VOICEMODE_KOKORO_PORT=8880
-
-# Directory for Kokoro models
-# VOICEMODE_KOKORO_MODELS_DIR=~/.voicemode/models/kokoro
-
-# Directory for Kokoro cache
-# VOICEMODE_KOKORO_CACHE_DIR=~/.voicemode/cache/kokoro
-
-# Default Kokoro voice
-# VOICEMODE_KOKORO_DEFAULT_VOICE=af_sky
 
 #############
 # Recording & Voice Activity Detection
@@ -233,6 +214,10 @@ def load_voicemode_env():
 #############
 # Audio Format Configuration
 #############
+
+# TTS sample rate in Hz (default: 24000)
+# Use 24000 for OpenAI, 44100 for Fish Speech
+# VOICEMODE_SAMPLE_RATE=24000
 
 # Global audio format: pcm, opus, mp3, wav, flac, aac (default: pcm)
 # VOICEMODE_AUDIO_FORMAT=pcm
@@ -487,8 +472,8 @@ ALWAYS_TRY_LOCAL = os.getenv("VOICEMODE_ALWAYS_TRY_LOCAL", "true").lower() in ("
 # Use simple failover without health checks
 # Simple failover is now the only mode - configuration removed
 
-# Auto-start configuration
-AUTO_START_KOKORO = os.getenv("VOICEMODE_AUTO_START_KOKORO", "").lower() in ("true", "1", "yes", "on")
+
+
 
 # ==================== CONCH CONFIGURATION ====================
 # The conch is a coordination mechanism for multi-agent voice conversations
@@ -602,14 +587,6 @@ WHISPER_PORT = int(os.getenv("VOICEMODE_WHISPER_PORT", "2022"))
 WHISPER_LANGUAGE = os.getenv("VOICEMODE_WHISPER_LANGUAGE", "auto")
 WHISPER_MODEL_PATH = expand_path(os.getenv("VOICEMODE_WHISPER_MODEL_PATH", str(Path.home() / ".voicemode" / "services" / "whisper" / "models")))
 
-# ==================== KOKORO CONFIGURATION ====================
-
-# Kokoro-specific configuration
-KOKORO_PORT = int(os.getenv("VOICEMODE_KOKORO_PORT", "8880"))
-KOKORO_MODELS_DIR = expand_path(os.getenv("VOICEMODE_KOKORO_MODELS_DIR", str(BASE_DIR / "models" / "kokoro")))
-KOKORO_CACHE_DIR = expand_path(os.getenv("VOICEMODE_KOKORO_CACHE_DIR", str(BASE_DIR / "cache" / "kokoro")))
-KOKORO_DEFAULT_VOICE = os.getenv("VOICEMODE_KOKORO_DEFAULT_VOICE", "af_sky")
-
 # ==================== SERVICE MANAGEMENT CONFIGURATION ====================
 
 # Auto-enable services after installation
@@ -624,7 +601,8 @@ SOUNDFONTS_ENABLED = env_bool("VOICEMODE_SOUNDFONTS_ENABLED", True)
 # ==================== AUDIO CONFIGURATION ====================
 
 # Audio parameters
-SAMPLE_RATE = 24000  # Standard TTS sample rate for both OpenAI and Kokoro
+# TTS sample rate - 24000 for OpenAI, 44100 for Fish Speech
+SAMPLE_RATE = int(os.getenv("VOICEMODE_SAMPLE_RATE", "24000"))
 CHANNELS = 1
 
 # ==================== SILENCE DETECTION CONFIGURATION ====================
@@ -1213,7 +1191,7 @@ def get_provider_supported_formats(provider: str, operation: str = "tts") -> lis
     """Get list of audio formats supported by a provider.
     
     Args:
-        provider: Provider name (e.g., 'openai', 'kokoro', 'whisper-local')
+        provider: Provider name (e.g., 'openai', 'local', 'whisper-local')
         operation: 'tts' or 'stt'
     
     Returns:
@@ -1226,10 +1204,6 @@ def get_provider_supported_formats(provider: str, operation: str = "tts") -> lis
         "openai": {
             "tts": ["opus", "mp3", "aac", "flac", "wav", "pcm"],
             "stt": ["mp3", "opus", "wav", "flac", "m4a", "webm"]
-        },
-        "kokoro": {
-            "tts": ["mp3", "opus", "flac", "wav", "pcm"],  # AAC is not currently supported
-            "stt": []  # Kokoro is TTS only
         },
         # STT providers
         "whisper-local": {

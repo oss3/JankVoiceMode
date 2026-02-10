@@ -14,7 +14,6 @@ For a fast, fully automated install on Apple Silicon:
 ```bash
 uvx voice-mode-install --yes
 voicemode service install whisper
-voicemode service install kokoro
 ```
 
 ## What Gets Installed
@@ -24,7 +23,6 @@ voicemode service install kokoro
 | FFmpeg | ~50MB | Audio processing (via Homebrew) |
 | VoiceMode CLI | ~10MB | Command-line tools |
 | Whisper (base) | ~150MB | Speech-to-text |
-| Kokoro | ~350MB | Text-to-speech |
 
 ## Implementation
 
@@ -43,13 +41,11 @@ voicemode service install kokoro
 
    # Install local services
    voicemode service install whisper
-   voicemode service install kokoro
    ```
 
 4. **Verify services are running:**
    ```bash
    voicemode service status whisper
-   voicemode service status kokoro
    ```
 
 5. **Reconnect MCP server:**

@@ -35,27 +35,6 @@ def check_old_whisper_installations() -> List[Path]:
     return old_files
 
 
-def check_old_kokoro_installations() -> List[Path]:
-    """Check for old kokoro service installations."""
-    old_files = []
-    
-    if os.uname().sysname == "Darwin":
-        launchd_dir = Path.home() / "Library" / "LaunchAgents"
-        # Check for any kokoro plist with port numbers
-        for plist in launchd_dir.glob("com.voicemode.kokoro-*.plist"):
-            old_files.append(plist)
-    
-    elif os.uname().sysname == "Linux":
-        systemd_dir = Path.home() / ".config" / "systemd" / "user"
-        old_names = ["kokoro-fastapi.service"]
-        for name in old_names:
-            path = systemd_dir / name
-            if path.exists():
-                old_files.append(path)
-    
-    return old_files
-
-
 def auto_migrate_if_needed(service_name: str) -> Optional[str]:
     """
     Automatically migrate old service files if found.
@@ -65,8 +44,6 @@ def auto_migrate_if_needed(service_name: str) -> Optional[str]:
     """
     if service_name == "whisper":
         old_files = check_old_whisper_installations()
-    elif service_name == "kokoro":
-        old_files = check_old_kokoro_installations()
     else:
         return None
     
@@ -89,13 +66,6 @@ def auto_migrate_if_needed(service_name: str) -> Optional[str]:
                     # Unload old service
                     subprocess.run(["launchctl", "unload", str(old_path)], capture_output=True)
                     # Remove file
-                    old_path.unlink()
-                    removed.append(str(old_path))
-                    logger.info(f"Removed old plist: {old_path}")
-                    
-                elif service_name == "kokoro" and "kokoro-" in old_path.name:
-                    # Remove extra kokoro instances
-                    subprocess.run(["launchctl", "unload", str(old_path)], capture_output=True)
                     old_path.unlink()
                     removed.append(str(old_path))
                     logger.info(f"Removed old plist: {old_path}")

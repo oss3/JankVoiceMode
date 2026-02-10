@@ -66,10 +66,10 @@ make docs-check
 
 2. **Tool System (`voice_mode/tools/`)**
    - **converse.py**: Primary voice conversation tool with TTS/STT integration
-   - **service.py**: Unified service management for Whisper/Kokoro
+   - **service.py**: Unified service management for Whisper and other services
    - **providers.py**: Provider discovery and registry management
    - **devices.py**: Audio device detection and management
-   - Services subdirectory contains install/uninstall tools for Whisper and Kokoro
+   - Services subdirectory contains install/uninstall tools for Whisper
    - See [Tool Loading Architecture](docs/reference/tool-loading-architecture.md) for internal details
 
 3. **Provider System (`voice_mode/providers.py`)**
@@ -92,7 +92,7 @@ make docs-check
 The project supports multiple voice service backends:
 - **OpenAI API**: Cloud-based TTS/STT (requires API key)
 - **Whisper.cpp**: Local speech-to-text service
-- **Kokoro**: Local text-to-speech with multiple voices
+- **Fish Speech** (or other OpenAI-compatible TTS): Local text-to-speech via OpenAI-compatible endpoints
 
 Services can be installed and managed through MCP tools, with automatic service discovery and health checking.
 

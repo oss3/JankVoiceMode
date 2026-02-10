@@ -39,7 +39,7 @@ dependencies = [
     "simpleaudio",
     "httpx",
     "websockets>=12.0",  # Required for voicemode connect command
-    "aiohttp",  # Required for Whisper and Kokoro service installers
+    "aiohttp",  # Required for Whisper service installer
     "psutil>=5.9.0",
     "setuptools",  # Required for pkg_resources used by webrtcvad
     "webrtcvad>=2.0.10",

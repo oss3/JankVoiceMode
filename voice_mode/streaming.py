@@ -289,7 +289,7 @@ async def stream_pcm_audio(
         if event_logger:
             event_logger.log_event(event_logger.TTS_PLAYBACK_START)
         
-        # Don't add stream parameter - Kokoro defaults to true, OpenAI doesn't support it
+        # Don't add stream parameter - some providers default to true, OpenAI doesn't support it
         
         logger.info("Starting true HTTP streaming with iter_bytes()")
         
@@ -493,7 +493,7 @@ async def stream_with_buffering(
     text: str,
     openai_client,
     request_params: dict,
-    sample_rate: int = 24000,  # TTS standard sample rate
+    sample_rate: int = SAMPLE_RATE,  # Use config sample rate (24000 for OpenAI, 44100 for Fish Speech)
     debug: bool = False,
     save_audio: bool = False,
     audio_dir: Optional[Path] = None,
@@ -526,7 +526,7 @@ async def stream_with_buffering(
         )
         stream.start()
         
-        # Don't add stream parameter - Kokoro defaults to true, OpenAI doesn't support it
+        # Don't add stream parameter - some providers default to true, OpenAI doesn't support it
         
         # Use the streaming response API for true HTTP streaming
         async with openai_client.audio.speech.with_streaming_response.create(

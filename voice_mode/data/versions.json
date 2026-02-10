@@ -29,14 +29,14 @@
     "1.2.0": {
       "date": "2025-11-25",
       "changes": [
-        "Added ~/.local/bin to PATH in Kokoro plist for uv compatibility",
+        "Added ~/.local/bin to PATH in service plists for uv compatibility",
         "Supports uv installed via curl installer (not just Homebrew)"
       ]
     },
     "1.2.1": {
       "date": "2025-11-30",
       "changes": [
-        "Fixed HOME variable substitution in Kokoro plist enable_service",
+        "Fixed HOME variable substitution in service plist enable_service",
         "HOME was not being expanded, causing literal {HOME} in PATH"
       ]
     },
